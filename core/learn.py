@@ -14,10 +14,11 @@ _OPTION_ERRORS = re.compile(
 
 # Never offered for adoption: shells, interpreters and wrappers whose "options" are
 # really someone else's program, plus tools where a help run is pointless.
-NEVER_SUGGEST = frozenset(
-    "sh bash zsh dash fish ksh python python3 node deno bun ruby perl php sudo doas env "
-    "xargs timeout nohup nice watch time stdbuf ionice exec command".split()
-)
+NEVER_SUGGEST = frozenset((
+    "sh", "bash", "zsh", "dash", "fish", "ksh", "python", "python3", "node", "deno", "bun",
+    "ruby", "perl", "php", "sudo", "doas", "env", "xargs", "timeout", "nohup", "nice",
+    "watch", "time", "stdbuf", "ionice", "exec", "command",
+))
 
 
 def looks_like_option_error(output: str) -> bool:
