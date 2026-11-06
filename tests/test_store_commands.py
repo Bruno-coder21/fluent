@@ -158,3 +158,17 @@ def test_unknown_verb_and_help(tmp_store):
     assert "I don't know 'dance'" in commands.handle(ctx, "dance")
     assert "/fluent adopt" in commands.handle(ctx, "help")
     assert "Start with: /fluent adopt git" in commands.handle(ctx, "")
+
+
+def test_cli_reference_text(tmp_store, monkeypatch):
+    from fluent.glue import context_ref
+
+    monkeypatch.setattr(context_ref, "store", lambda: tmp_store)
+    tmp_store.save(make_card())
+    text = context_ref.render_reference("tool")
+    assert text.startswith("fluent card: tool") and "Commands (2): rm, ls" in text
+    assert "Deletes things (fluent asks first): rm" in text
+    sub = context_ref.render_reference("tool rm")
+    assert "-f, --force" in sub
+    assert "hasn't learned nope" in context_ref.render_reference("nope")
+    assert context_ref.render_reference("") is None

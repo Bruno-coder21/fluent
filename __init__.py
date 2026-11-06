@@ -12,7 +12,8 @@ from __future__ import annotations
 
 def register(ctx):
     """Entry point Hermes calls when the plugin loads."""
-    from .glue import commands, hooks
+    from .glue import commands, context_ref, hooks
 
     hooks.install(ctx)
     commands.install(ctx)
+    context_ref.install(ctx)

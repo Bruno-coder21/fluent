@@ -1,0 +1,13 @@
+{
+  "name": "fluent",
+  "label": "fluent",
+  "description": "Your agent's terminal commands, checked against the real help of your programs.",
+  "icon": "Shield",
+  "version": "1.0.0",
+  "tab": {
+    "path": "/fluent",
+    "position": "after:skills"
+  },
+  "entry": "dist/index.js",
+  "api": "plugin_api.py"
+}
