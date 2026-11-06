@@ -40,6 +40,22 @@ class ParsedHelp:
     summary: str = ""
     usage: str = ""
     incomplete_hint: bool = False
+    # True only when the help carries a marker of a parser that answers --help before
+    # running anything (git, Go/cobra, argparse, click). Subcommands are explored only then.
+    safe_subcommands: bool = False
+
+
+_SAFE_MARKERS = (
+    re.compile(r"^USAGE\s*$(?s:.*)^[A-Z ]*FLAGS\s*$", re.M),  # gh-style cobra
+    re.compile(r"^Run '\S+(?: \S+)* COMMAND --help' for more information", re.M),  # docker
+    re.compile(r"-h, --help\s+help for \S+", re.M),  # cobra default template
+    re.compile(r"show this help message and exit"),  # argparse
+    re.compile(r"Show this message and exit\."),  # click
+)
+
+
+def has_safe_subcommand_marker(text: str) -> bool:
+    return any(p.search(text) for p in _SAFE_MARKERS)
 
 
 def detect_style(text: str, program: str = "") -> str:
@@ -55,6 +71,10 @@ def detect_style(text: str, program: str = "") -> str:
         r"^(Flags|Options|Global Flags|Global Options):\s*$", text, re.M
     ):
         return "cobra"
+    if "show this help message and exit" in text:
+        return "argparse"
+    if "Show this message and exit." in text:
+        return "click"
     if re.search(r"^\s*-{1,2}[A-Za-z0-9].*", text, re.M):
         return "gnu"
     return "generic"
@@ -64,7 +84,9 @@ def parse_help(text: str, program: str = "", style: str | None = None) -> Parsed
     style = style or detect_style(text, program)
     if style == "ffmpeg":
         return _parse_ffmpeg(text)
-    return _parse_sections(text, style)
+    parsed = _parse_sections(text, style)
+    parsed.safe_subcommands = style == "git" or has_safe_subcommand_marker(text)
+    return parsed
 
 
 def parse_option_spec(line: str, style: str = "gnu") -> Flag | None:

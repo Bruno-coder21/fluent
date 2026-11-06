@@ -31,6 +31,8 @@ FAKE = textwrap.dedent("""\
     Options:
       -v, --verbose        Be loud
       -c, --config string  Config file
+
+    Run 'faketool COMMAND --help' for more information on a command.
     EOF
       ;;
       "list --help") printf 'Usage:  faketool list [OPTIONS]\\n\\nList things\\n\\nOptions:\\n  -a, --all   Show all\\n  -q, --quiet  Only ids\\n';;
@@ -94,7 +96,7 @@ def test_slow_help_is_cut_and_marked_partial(tmp_path, monkeypatch):
     prog.write_text(textwrap.dedent("""\
         #!/bin/sh
         case "$*" in
-          "--help") printf 'Usage:  slowtool [OPTIONS] COMMAND\\n\\nCommands:\\n  a   A\\n  b   B\\n\\nOptions:\\n  -x, --xx   X\\n';;
+          "--help") printf 'Usage:  slowtool [OPTIONS] COMMAND\\n\\nCommands:\\n  a   A\\n  b   B\\n\\nOptions:\\n  -x, --xx   X\\n\\nRun '"'"'slowtool COMMAND --help'"'"' for more information on a command.\\n';;
           *) sleep 30;;
         esac
     """))
@@ -123,3 +125,40 @@ def test_real_git_merges_man_pages():
 def test_adopt_takes_names_not_paths(name):
     with pytest.raises(AdoptError, match="name as you'd type it"):
         adopt(name)
+
+
+def test_home_made_script_subcommands_are_never_run(tmp_path, monkeypatch):
+    """A script that lists "commands" but only checks --help as $1 must not be explored."""
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    marker = tmp_path / "WIPED"
+    prog = bindir / "mytool"
+    prog.write_text(textwrap.dedent(f"""\
+        #!/bin/sh
+        if [ "$1" = "--help" ]; then
+          printf 'mytool - my tool\\n\\nOptions:\\n  -v, --verbose   Be loud\\n  -q, --quiet     Quiet\\n  --help          Help\\n\\nCommands:\\n  wipe    Wipe everything\\n  list    List things\\n'
+          exit 0
+        fi
+        if [ "$1" = "wipe" ]; then touch "{marker}"; fi
+    """))
+    prog.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ['PATH']}")
+    card = adopt("mytool", man_dirs=[])
+    assert not marker.exists(), "a subcommand of a home-made script was executed"
+    assert "wipe" not in card.nodes
+
+
+def test_error_text_is_not_a_version(tmp_path, monkeypatch):
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    prog = bindir / "nover"
+    prog.write_text(textwrap.dedent("""\
+        #!/bin/sh
+        case "$1" in
+          --help) printf 'Usage: nover [OPTION]\\n  -a, --all   All\\n  -b, --bee   Bee\\n  -c, --cee   Cee\\n';;
+          *) echo "nover: unrecognized option '$1'"; exit 2;;
+        esac
+    """))
+    prog.chmod(0o755)
+    monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ['PATH']}")
+    assert adopt("nover", man_dirs=[]).version == ""

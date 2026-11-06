@@ -52,17 +52,16 @@ def on_pre_tool_call(tool_name: str = "", args: dict | None = None, tool_call_id
             return None
         verdict = guard().check(args.get("command") or "")
         if verdict.action == "block":
-            store().bump(caught=len(verdict.findings),
-                         tokens_saved=TOKENS_PER_CATCH * len(verdict.findings))
+            _count(caught=len(verdict.findings), tokens_saved=TOKENS_PER_CATCH * len(verdict.findings))
             notify(verdict.notice)
             return {"action": "block", "message": verdict.message}
         if verdict.action == "warn":
-            store().bump(caught=len(verdict.findings))
+            _count(caught=len(verdict.findings))
             _remember_note(tool_call_id, verdict.message)
             notify(verdict.notice)
             return None
         if verdict.action == "approve":
-            store().bump(asked=1)
+            _count(asked=1)
             return {"action": "approve", "message": verdict.message, "rule_key": verdict.rule_key}
         return None
     except Exception:  # never block the agent because of a fluent bug
@@ -91,6 +90,8 @@ def on_post_tool_call(tool_name: str = "", args: dict | None = None, result: str
             with _lock:
                 if (session_id, p) in _offered:
                     continue
+                if len(_offered) > 1000:
+                    _offered.clear()
                 _offered.add((session_id, p))
             if not shutil.which(p):
                 continue
@@ -115,6 +116,14 @@ def on_transform_terminal_output(command: str = "", output: str = "", returncode
     except Exception:
         logger.debug("fluent: transform_terminal_output failed", exc_info=True)
         return None
+
+
+def _count(**amounts: int) -> None:
+    """Counters are a nicety: a disk error here must never change the verdict."""
+    try:
+        store().bump(**amounts)
+    except Exception:
+        logger.debug("fluent: counter update failed", exc_info=True)
 
 
 def notify(text: str) -> None:

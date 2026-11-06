@@ -43,6 +43,10 @@ _DESTROY_FLAG = re.compile(
 )
 _SAFE_FLAG = re.compile(r"\b(dry[- ]?run|do not|don't|never|prevent|instead of|keep)\b", re.I)
 
+# Global options between a program and its verb, as in Hermes core
+# (tools/approval_detection.py _CONTAINER_GLOBAL_FLAGS): possessive, so no backtracking.
+_GLOBALS = r"(?:-\S++(?:\s(?!-\S)\S++)?\s++)*"
+
 # What Hermes core ALREADY sends to its own approval prompt (tools/approval_detection.py).
 # fluent skips these so the user is never asked twice for the same command.
 CORE_ALREADY_ASKS = [
@@ -56,9 +60,9 @@ CORE_ALREADY_ASKS = [
         r"\bgit\s+branch\b.*(-d\b|--delete\b).*(-f\b|--force\b)",
         r"\bgit\s+branch\b.*(-f\b|--force\b).*(-d\b|--delete\b)",
         # only global options may sit between docker and the verb (as in Hermes core);
-        # a container named "restart-x" must not count
-        r"\bdocker(-compose|\s+compose)\s+(-\S+\s+(\S+\s+)?)*?(restart|stop|kill|down)\b",
-        r"\bdocker\s+(-\S+\s+(\S+\s+)?)*?(restart|stop|kill)\b",
+        # possessive quantifiers keep this linear-time (it runs in a fail-closed hook)
+        r"\bdocker(?:-compose|\s+compose)\s+" + _GLOBALS + r"(restart|stop|kill|down)\b",
+        r"\bdocker\s+" + _GLOBALS + r"(restart|stop|kill)\b",
         r"\bdocker\s+.*(-H|--host)[=\s]+\S+",
         r"\bdocker\s+context\s+use\b",
         r"\bfind\b.*-delete\b",

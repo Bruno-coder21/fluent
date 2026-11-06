@@ -172,3 +172,15 @@ def test_cli_reference_text(tmp_store, monkeypatch):
     assert "-f, --force" in sub
     assert "hasn't learned nope" in context_ref.render_reference("nope")
     assert context_ref.render_reference("") is None
+
+
+
+def test_trash_is_pruned_when_no_action_can_restore_it(tmp_path):
+    from fluent.core import store as store_mod
+    s = CardStore(tmp_path)
+    for k in range(store_mod.MAX_ACTIONS + 8):
+        s.save(make_card(version=str(k)))
+    trash = list((tmp_path / "trash").glob("*.json"))
+    assert len(trash) <= store_mod.MAX_ACTIONS
+    s.undo()
+    assert s.load("tool").version == str(store_mod.MAX_ACTIONS + 6)

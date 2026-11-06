@@ -12,7 +12,9 @@ from __future__ import annotations
 
 import concurrent.futures as cf
 import os
+import re
 import shutil
+import signal
 import subprocess
 import tempfile
 import threading
@@ -72,6 +74,8 @@ STRATEGIES: dict[str, Strategy] = {
     "curl": Strategy(root=[["--help", "all"], ["--help"]], recurse=False, full_help=True),
 }
 
+_VERSION_ERROR = re.compile(r"unknown|illegal|unrecognized|invalid|usage:|error|not found", re.I)
+
 _SAFE_ENV_KEYS = ("PATH", "HOME", "USER", "LOGNAME", "TMPDIR", "XDG_CONFIG_HOME", "XDG_DATA_HOME")
 
 
@@ -117,7 +121,7 @@ class Adopter:
             card.style = parsed.style
             card.single_dash_long = self.strategy.single_dash_long or parsed.style == "ffmpeg"
             card.abbrev_ok = (self.strategy.abbrev_ok if self.strategy.abbrev_ok is not None
-                              else parsed.style in ("gnu", "git"))
+                              else parsed.style in ("gnu", "git", "argparse"))
             root = self._node_from(card, [], parsed)
             card.nodes[""] = root
             self.progress("root", {"style": parsed.style, "options": len(root.flags)})
@@ -137,7 +141,7 @@ class Adopter:
         for args in self.strategy.version:
             out = self._run(args, quiet=True)
             line = next((ln.strip() for ln in out.splitlines() if ln.strip()), "")
-            if line and "unknown" not in line.lower() and "illegal" not in line.lower():
+            if line and not _VERSION_ERROR.search(line):
                 return _short_version(line)
         return ""
 
@@ -157,12 +161,12 @@ class Adopter:
         return best
 
     def _should_recurse(self, parsed: ParsedHelp) -> bool:
+        # Only help styles that are known to answer --help before doing anything
+        # (Go/cobra, git parse-options, argparse, click). A home-made script that lists
+        # "commands" may run them for real, so its subcommands are never explored.
         if self.strategy.recurse is not None:
             return self.strategy.recurse
-        if parsed.style == "cobra":
-            return True
-        has_help_flag = any("--help" in f.names for f in parsed.flags)
-        return bool(parsed.subcommands) and has_help_flag
+        return parsed.safe_subcommands and bool(parsed.subcommands)
 
     def _explore(self, card: Card, root: Node) -> None:
         if self.strategy.list_cmds:
@@ -263,23 +267,29 @@ class Adopter:
         remaining = self.budget - (time.monotonic() - self._start) if self._start else CALL_TIMEOUT
         timeout = max(0.5, min(CALL_TIMEOUT, remaining))
         try:
-            proc = subprocess.run(
+            proc = subprocess.Popen(
                 [self.path, *args],
                 stdin=subprocess.DEVNULL,
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 cwd=self._scratch or None,
                 env=_help_env(),
-                timeout=timeout,
-                check=False,
+                start_new_session=True,  # its own process group, so a timeout kills it all
             )
+        except OSError:
+            return ""
+        try:
+            out, _ = proc.communicate(timeout=timeout)
         except subprocess.TimeoutExpired:
+            try:
+                os.killpg(proc.pid, signal.SIGKILL)
+            except OSError:
+                pass
+            proc.communicate()
             if not quiet:
                 self.timed_out = True
             return ""
-        except OSError:
-            return ""
-        return proc.stdout[:MAX_OUTPUT].decode("utf-8", errors="replace")
+        return (out or b"")[:MAX_OUTPUT].decode("utf-8", errors="replace")
 
     def _find_man(self, page: str) -> str | None:
         for d in self.man_dirs:
@@ -316,8 +326,6 @@ def _man_dirs() -> list[str]:
 
 
 def _short_version(line: str) -> str:
-    import re
-
     m = re.search(r"\d+(\.\d+)+([.-][\w]+)?", line)
     return m.group(0) if m else line[:40]
 

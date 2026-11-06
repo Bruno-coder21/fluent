@@ -9,7 +9,6 @@ from __future__ import annotations
 
 import asyncio
 import json
-import os
 from pathlib import Path
 
 from fastapi import APIRouter
@@ -21,13 +20,9 @@ _cache: dict[str, tuple[float, dict]] = {}
 
 
 def _data_dir() -> Path:
-    try:
-        from plugins.plugin_storage import plugin_data_dir  # public Hermes API
+    from plugins.plugin_storage import plugin_data_dir  # public Hermes API; follows the profile
 
-        return Path(plugin_data_dir("fluent"))
-    except Exception:
-        home = os.environ.get("HERMES_HOME") or os.path.expanduser("~/.hermes")
-        return Path(home) / "plugin-data" / "fluent"
+    return Path(plugin_data_dir("fluent"))
 
 
 def _read(path: Path, default):

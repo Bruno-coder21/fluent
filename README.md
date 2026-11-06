@@ -46,7 +46,8 @@ When everything is fine, fluent is silent.
 ## Install
 
 ```bash
-hermes plugins install Bruno-coder21/fluent --enable
+hermes plugins install fluent --enable                  # from the Hermes plugin catalog
+hermes plugins install Bruno-coder21/fluent --enable    # or straight from GitHub
 ```
 
 Then, in any Hermes chat:
@@ -93,30 +94,49 @@ It reads commands the way a shell does: pipes, `&&`, `;`, subshells, `sudo`, `en
 
 **Tested**: 311 real-world valid commands across git, gh, docker, ffmpeg, curl, tar, jq
 and rsync are never blocked; 17 typical AI mistakes are all caught with the right fix
-(`tests/fixtures/corpus/`). 524 tests in total.
+(`tests/fixtures/corpus/`). 542 tests in total.
 
 ## What fluent does on your machine (disclosure)
 
-- **Runs help commands when you adopt a program**: `<program> --help`, `<program> -h`,
-  `<program> --version`, and `<program> <command> --help` for each command, but only for
-  help styles known to answer `--help` without acting (git parse-options, Go/cobra like
-  gh and docker, argparse/click). It never runs a program without a help flag. Calls use
-  no shell, a closed stdin, an empty scratch working directory, pagers disabled, a C
-  locale, 5 seconds per call and 25 seconds per program. `git filter-branch` is never
-  executed. Only adopt programs you trust to print help.
-- **Reads man pages** from the standard man directories (`/usr/share/man`, `/usr/local/share/man`, `MANPATH`).
+- **Runs the program you adopt, on the host, with help and version arguments only.**
+  `/fluent adopt <program>` runs `<program>` with `--version`, `-version`, `version` or
+  `-V` (until one prints a version) and `--help`, `-h` or `help` (until one prints a help
+  it can read). Per program: git also gets `git --list-cmds=main,nohelpers` and
+  `git <command> -h`; ffmpeg `-hide_banner -h full`; curl `--help all`.
+  `<program> <command> --help` is run for each command **only when the help carries the
+  marker of a parser that answers `--help` before doing anything**: git, Go/cobra (gh,
+  docker, kubectl), argparse or click. A home-made script is never explored this way, and
+  `git filter-branch` is never executed. A program that ignores these arguments simply
+  runs, so only adopt programs you trust to print their help.
+- **How it runs them**: no shell, stdin closed, an empty temporary working directory, its
+  own process group (killed on timeout), 5 seconds per call and about 25 seconds per
+  program. The environment is filtered to `PATH`, `HOME`, `USER`, `LOGNAME`, `TMPDIR`,
+  `XDG_CONFIG_HOME`, `XDG_DATA_HOME` plus `LANG=C`, `NO_COLOR=1` and pagers set to `cat`:
+  your real home folder is passed (so CLI plugins such as `docker compose` are found), API
+  keys and tokens are not.
+- **Runs on the machine where Hermes runs**, even when your terminal backend is Docker,
+  SSH or Modal. In that case the guard stays silent, and `/fluent adopt` says so.
+- **Reads** man pages from the standard man directories (`/usr/share/man`,
+  `/usr/local/share/man`, `MANPATH`) and `terminal.backend` from your Hermes config.
 - **Writes only to its own data folder**: `<HERMES_HOME>/plugin-data/fluent/` (cards as
-  JSON, a trash folder for undo, settings and counters).
-- **Posts short notices** in the conversation (adoption progress, "fluent caught ...",
-  an offer to learn a program).
-- **Adds approval requests** through Hermes's own approval system for commands it
-  classifies as destructive; it never approves, skips or disables any approval.
+  JSON, a small trash folder for undo that is pruned automatically, settings and counters).
+- **Vetoes** terminal commands that use a long option the installed program doesn't have
+  (default `block` mode; `/fluent mode warn` or `off` to change it).
+- **Adds approval requests** through Hermes's own approval prompt for commands it
+  classifies as destructive. It never approves, skips or disables any approval. The
+  request is keyed per subcommand (and per risky option), so answering *Always* remembers
+  only that one (`fluent:<program>:<command>[:<option>]`). Under cron and other unattended
+  runs Hermes's approval policy applies (default: deny), so commands fluent flags as
+  destructive are refused there; use `/fluent risk off` or Hermes's `approvals.cron_mode`
+  for jobs that must delete.
+- **Posts short notices** in the conversation (adoption progress, "fluent caught ...", a
+  one-time offer to learn a program).
 - **No network calls, no telemetry, no model calls, no credentials.**
 - The dashboard tab reads the same data files through one read-only endpoint
   (`GET /api/plugins/fluent/summary`).
 - Uses only public Hermes surfaces: hooks (`pre_tool_call`, `post_tool_call`,
-  `transform_terminal_output`), a slash command, an `@cli:` context reference and a
-  dashboard tab. Live progress messages need the default `plugins.isolation: in_process`.
+  `transform_terminal_output`), the `/fluent` slash command, an `@cli:` context reference
+  and a dashboard tab. Live progress messages need the default `plugins.isolation: in_process`.
 
 ## Known limits
 
@@ -125,7 +145,10 @@ and rsync are never blocked; 17 typical AI mistakes are all caught with the righ
 - On remote terminal backends (Docker, SSH, Modal) the guard stays silent: the card
   describes the program on this machine, not the one on the backend.
 - Risk classes come from command names and their own help summaries; they can only add
-  a prompt, never remove one.
+  a prompt, never remove one. Many destructive forms are not asked about (`git stash drop`,
+  `gh api -X DELETE`, `rsync --delete-excluded`).
+- fluent trusts the binary on Hermes's own `PATH`; a different copy on a session's `PATH`
+  (venv, nvm, direnv) may be judged against the wrong help.
 - Tested on Linux (Ubuntu 24.04). macOS uses the same code paths; Windows is untested.
 
 ## Next
@@ -138,7 +161,7 @@ and rsync are never blocked; 17 typical AI mistakes are all caught with the righ
 ## Develop
 
 ```bash
-scripts/test.sh                       # 524 tests (throwaway uv env, Python 3.14)
+scripts/test.sh                       # 542 tests (throwaway uv env, Python 3.14)
 scripts/capture_fixtures.sh           # refresh help/man fixtures from this machine
 hermes plugins validate . --install-deps
 ```

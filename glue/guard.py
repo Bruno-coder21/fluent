@@ -56,6 +56,9 @@ class Guard:
             card = self.store.load(inv.program)
             if card is None:
                 continue
+            if "/" in inv.program_path and (not os.path.isabs(inv.program_path)
+                                            or os.path.realpath(inv.program_path) != card.path):
+                continue  # ./git or /opt/other/git: not the binary this card was read from
             used.append(card.program)
             chk = check_invocation(inv, card)
             if not (local and self._fresh(card)):
@@ -67,10 +70,9 @@ class Guard:
         if findings and cfg.get("mode") == "warn" and ask is not None:
             # warn mode never drops a destructive-command prompt: ask, and mention the finding
             chk, card, segment = ask
-            key = ".".join(chk.node.path) if chk.node and chk.node.path else "-"
             return Verdict("approve", message=_approval_message(chk, card, segment) + "\n"
                            + _model_message(findings, "warn"),
-                           rule_key=f"fluent:{card.program}:{key}", programs=used)
+                           rule_key=_rule_key(chk, card), programs=used)
         if findings:
             mode = "warn" if cfg.get("mode") == "warn" else "block"
             return Verdict(mode, message=_model_message(findings, mode),
@@ -78,9 +80,8 @@ class Guard:
                            programs=used)
         if ask is not None:
             chk, card, segment = ask
-            key = ".".join(chk.node.path) if chk.node and chk.node.path else "-"
             return Verdict("approve", message=_approval_message(chk, card, segment),
-                           rule_key=f"fluent:{card.program}:{key}", programs=used)
+                           rule_key=_rule_key(chk, card), programs=used)
         return Verdict(programs=used)
 
     def _fresh(self, card: Card, ttl: float = 10.0) -> bool:
@@ -103,10 +104,18 @@ class Guard:
         return ok
 
 
+def _rule_key(chk: Check, card: Card) -> str:
+    """One remembered "Always" covers one subcommand (and one risky option), no more."""
+    key = ".".join(chk.node.path) if chk.node and chk.node.path else "-"
+    return f"fluent:{card.program}:{key}" + (f":{chk.destroy_flag}" if chk.destroy_flag else "")
+
+
+def terminal_backend() -> str:
+    return _default_backend()
+
+
 def _default_backend() -> str:
-    env = os.environ.get("TERMINAL_ENV")
-    if env:
-        return env
+    # read the profile's own config (scope-aware), never a process-wide env var
     try:
         from hermes_cli.config import load_config_readonly  # public Hermes API
 

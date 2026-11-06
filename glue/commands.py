@@ -115,7 +115,17 @@ def _adopt(ctx, rest: list[str]) -> str | None:
     except AdoptError as e:
         return live.finish(f"⚠️ {e}")
     store().save(card)
-    return live.finish(messages.adopt_done(card))
+    text = messages.adopt_done(card)
+    try:
+        from .guard import terminal_backend
+
+        backend = terminal_backend()
+    except Exception:
+        backend = "local"
+    if backend != "local":
+        text += (f"\nNote: your terminal runs on the {backend} backend; fluent only checks "
+                 "commands that run on this machine.")
+    return live.finish(text)
 
 
 def _show(rest: list[str]) -> str:

@@ -164,7 +164,17 @@ class CardStore:
             return []
 
     def _write_actions(self, actions: list[dict]) -> None:
-        _atomic_write(self.actions_file, json.dumps(actions[-MAX_ACTIONS:]))
+        kept = actions[-MAX_ACTIONS:]
+        _atomic_write(self.actions_file, json.dumps(kept))
+        # trash files no remaining action can restore are deleted (a git card is ~0.5 MB)
+        referenced = {a.get(k) for a in kept for k in ("trash", "replaced") if a.get(k)}
+        if self.trash_dir.is_dir():
+            for f in self.trash_dir.glob("*.json"):
+                if f.name not in referenced:
+                    try:
+                        f.unlink()
+                    except OSError:
+                        pass
 
     def _log(self, action: dict) -> None:
         action["time"] = time.time()

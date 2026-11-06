@@ -31,15 +31,20 @@ _ESCAPES = [
     (re.compile(r"\\\|"), ""),
 ]
 
+MAX_MAN_BYTES = 8_000_000
+
 _HEADER_MACROS = (".TP", ".PP", ".LP", ".P", ".sp", ".HP")
 _INLINE_MACROS = (".B ", ".BI ", ".BR ", ".IR ", ".I ", ".RB ")
 
 
 def read_man_file(path: str | Path) -> str:
     p = Path(path)
-    data = p.read_bytes()
     if p.suffix == ".gz":
-        data = gzip.decompress(data)
+        with gzip.open(p, "rb") as fh:
+            data = fh.read(MAX_MAN_BYTES)
+    else:
+        with open(p, "rb") as fh:
+            data = fh.read(MAX_MAN_BYTES)
     return data.decode("utf-8", errors="replace")
 
 

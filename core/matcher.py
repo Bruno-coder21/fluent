@@ -44,6 +44,7 @@ class Check:
     findings: list[Finding] = field(default_factory=list)
     destroy: bool = False  # the subcommand or a flag is destructive
     destroy_reason: str = ""
+    destroy_flag: str = ""  # the option that made it destructive, if any
     certain: bool = False  # the subcommand was resolved with high confidence
 
 
@@ -119,6 +120,7 @@ def check_invocation(inv: Invocation, card: Card) -> Check:
             flag = _flag_for(t, known, long_names, card)
             if flag is not None and flag.destroy and not chk.destroy:
                 chk.destroy, chk.destroy_reason = True, f"{flag.names[-1]}: {flag.desc}".strip(": ")
+                chk.destroy_flag = flag.names[-1]
         expecting_value = takes
     if not chk.certain:
         chk.findings = []  # never judge options on a command we didn't fully read

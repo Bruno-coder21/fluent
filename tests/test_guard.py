@@ -69,7 +69,7 @@ def test_typical_mistakes_are_caught(real_guard, line):
 def test_destructive_commands_ask_through_hermes(real_guard):
     if "rsync" in PROGRAMS:
         v = real_guard.check("rsync -av --delete src/ dst/")
-        assert v.action == "approve" and v.rule_key == "fluent:rsync:-"
+        assert v.action == "approve" and v.rule_key == "fluent:rsync:-:--delete"
     if "docker" in PROGRAMS:
         v = real_guard.check("docker image prune -a")
         assert v.action == "approve" and v.rule_key == "fluent:docker:image.prune"
@@ -263,3 +263,23 @@ def test_warn_mode_keeps_the_destructive_prompt(real_store):
         assert v.action == "approve" and "--exlude" in v.message
     finally:
         real_store.set_config("mode", "block")
+
+
+# ----------------------------------------------------------------- maintainer review regressions
+def test_docker_rule_is_linear_time():
+    import time
+    from fluent.core.risk import core_already_asks
+    start = time.perf_counter()
+    assert core_already_asks("docker " + "-a " * 200 + "system prune") is False
+    assert core_already_asks("docker " + "--log-level debug " * 50 + "stop web") is True
+    assert time.perf_counter() - start < 0.05
+
+
+def test_path_qualified_program_is_not_judged_against_another_binary(real_store):
+    if "curl" not in PROGRAMS:
+        pytest.skip("needs curl")
+    g = Guard(real_store, backend=lambda: "local")
+    assert g.check("./curl --silentt x").action == "allow"
+    assert g.check("/opt/other/curl --silentt x").action == "allow"
+    real = shutil.which("curl")
+    assert g.check(f"{real} --silentt x").action == "block"
