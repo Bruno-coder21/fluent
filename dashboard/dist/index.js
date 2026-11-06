@@ -59,7 +59,7 @@
   function ProgramRow(p) {
     var cell = { padding: "10px 12px", borderTop: "1px solid rgba(127,127,127,.18)" };
     return h("tr", null,
-      h("td", { style: Object.assign({ fontFamily: "ui-monospace, monospace", fontWeight: 600 }, cell) },
+      h("td", { style: Object.assign({ fontWeight: 600 }, cell) },
         p.program, h("span", { style: { opacity: 0.55, fontWeight: 400, marginLeft: 8 } }, p.version)),
       h("td", { style: cell }, p.subcommands ? fmt(p.subcommands) : "—"),
       h("td", { style: cell }, fmt(p.options)),
