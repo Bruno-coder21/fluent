@@ -1,0 +1,16 @@
+name: fluent
+version: "0.1.0"
+description: >-
+  Your agent becomes fluent in any program. fluent reads the help and man pages of the
+  command-line programs installed on your machine, then checks every terminal command the
+  agent runs against them before it runs: invented flags are caught with the right fix,
+  and destructive subcommands go to Hermes's own approval prompt.
+author: Bruno Verona
+license: MIT
+homepage: https://github.com/Bruno-coder21/fluent
+requires_hermes: ">=0.23.0"
+provides_tools: []
+provides_hooks:
+  - pre_tool_call
+  - post_tool_call
+  - transform_terminal_output
