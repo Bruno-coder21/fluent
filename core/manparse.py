@@ -15,7 +15,7 @@ import re
 from pathlib import Path
 
 from .card import Flag
-from .helpparse import parse_option_spec
+from .helpparse import parse_option_spec, usage_flags
 
 _ESCAPES = [
     (re.compile(r"\\f(\[[^\]]*\]|\(..|.)"), ""),  # font changes \fB \fR \f(CW \f[I]
@@ -79,9 +79,31 @@ def option_headers(src: str) -> list[str]:
     return out
 
 
+def synopsis_lines(src: str) -> list[str]:
+    """Decoded text lines of the SYNOPSIS section."""
+    out, inside = [], False
+    for raw in src.splitlines():
+        if raw.startswith(".SH"):
+            inside = "SYNOPSIS" in raw.upper()
+            continue
+        if inside and raw and not raw.startswith((".", "'")):
+            out.append(decode_roff(raw))
+    return out
+
+
+_SYNONYM = re.compile(r"(?<![\w-])(--?[A-Za-z][\w-]*) is (?:a synonym|an alias) (?:of|for) (--?[A-Za-z][\w-]*)")
+
+
 def parse_man(src: str) -> list[Flag]:
     """Flags found in a man page, merged by name."""
     flags: dict[str, Flag] = {}
+    for line in synopsis_lines(src):
+        for flag in usage_flags(line):
+            flags.setdefault(flag.names[0], flag)
+    # prose like "--staged is a synonym of --cached" (git diff) names a real option
+    for m in _SYNONYM.finditer(decode_roff(src)):
+        flags.setdefault(m.group(1), Flag(names=[m.group(1)], takes_value=None,
+                                          desc=f"synonym of {m.group(2)}"))
     for header in option_headers(src):
         # a header can list several spellings: "--relative, -R" or "-a, --all"
         flag = parse_option_spec(header + "  ", style="man")

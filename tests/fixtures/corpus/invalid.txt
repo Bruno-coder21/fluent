@@ -1,0 +1,19 @@
+# Mistakes an AI agent typically makes. fluent MUST catch each one.
+# Format: command <TAB> wrong token <TAB> expected suggestion (empty = no suggestion required)
+ffmpeg -i in.mp4 --crf 23 out.mp4	--crf	-crf
+ffmpeg -i in.mp4 -c:v libx264 -crff 23 out.mp4	-crff	-crf
+ffmpeg -i in.mp4 --vf scale=640:-2 out.mp4	--vf	-vf
+git log --oneline --graphs	--graphs	--graph
+git commit --ammend	--ammend	--amend
+git status --shortt	--shortt	--short
+git push --set-upstreem origin x	--set-upstreem	--set-upstream
+docker ps --running	--running
+docker run --rmm alpine	--rmm	--rm
+docker logs --follows web	--follows	--follow
+gh repo list --limitt 5	--limitt	--limit
+gh pr create --titel x	--titel	--title
+curl --silentt https://x	--silentt	--silent
+curl --max-tme 5 https://x	--max-tme	--max-time
+tar --extrakt -f a.tar	--extrakt	--extract
+jq --raw-outptu .	--raw-outptu	--raw-output
+rsync -av --exlude=x src/ dst/	--exlude	--exclude

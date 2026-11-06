@@ -16,6 +16,12 @@ from .card import Card
 
 MAX_ACTIONS = 30
 
+DEFAULT_CONFIG = {
+    "mode": "block",  # block | warn | off   (what to do with an option that doesn't exist)
+    "risk_prompts": True,  # ask before destructive subcommands Hermes doesn't already ask about
+    "not_now": [],  # programs the user doesn't want suggested
+}
+
 
 class CardStore:
     def __init__(self, base_dir: str | os.PathLike):
@@ -23,8 +29,44 @@ class CardStore:
         self.cards_dir = self.base / "cards"
         self.trash_dir = self.base / "trash"
         self.actions_file = self.base / "actions.json"
+        self.config_file = self.base / "config.json"
+        self.counters_file = self.base / "counters.json"
         self._cache: dict[str, tuple[float, Card]] = {}
         self._lock = threading.Lock()
+        self._programs_cache: tuple[float, list[str]] = (0.0, [])
+
+    # ------------------------------------------------------------------ settings
+    def config(self) -> dict:
+        data = _read_json(self.config_file, {})
+        return {**DEFAULT_CONFIG, **(data if isinstance(data, dict) else {})}
+
+    def set_config(self, key: str, value) -> None:
+        with self._lock:
+            data = _read_json(self.config_file, {})
+            data = data if isinstance(data, dict) else {}
+            data[key] = value
+            _atomic_write(self.config_file, json.dumps(data))
+
+    # ------------------------------------------------------------------ counters (the rings)
+    def counters(self) -> dict:
+        data = _read_json(self.counters_file, {})
+        return data if isinstance(data, dict) else {}
+
+    def bump(self, **amounts: int) -> None:
+        with self._lock:
+            data = self.counters()
+            for k, v in amounts.items():
+                data[k] = int(data.get(k, 0)) + int(v)
+            _atomic_write(self.counters_file, json.dumps(data))
+
+    def programs_cached(self, ttl: float = 2.0) -> list[str]:
+        """``programs()`` with a short cache: the guard asks on every terminal call."""
+        now = time.monotonic()
+        stamp, progs = self._programs_cache
+        if now - stamp > ttl:
+            progs = self.programs()
+            self._programs_cache = (now, progs)
+        return progs
 
     # ------------------------------------------------------------------ cards
     def card_path(self, program: str) -> Path:
@@ -57,6 +99,7 @@ class CardStore:
             replaced = self._to_trash(card.program) if self.card_path(card.program).exists() else None
             _atomic_write(self.card_path(card.program), card.to_json())
             self._log({"op": "adopt", "program": card.program, "replaced": replaced})
+            self._programs_cache = (0.0, [])
 
     def forget(self, program: str) -> bool:
         with self._lock:
@@ -92,6 +135,7 @@ class CardStore:
         dest = self.trash_dir / f"{_safe(program)}-{time.time_ns()}.json"
         os.replace(src, dest)
         self._cache.pop(program, None)
+        self._programs_cache = (0.0, [])
         return dest.name
 
     def _restore(self, program: str, trash_name: str) -> None:
@@ -100,6 +144,7 @@ class CardStore:
             self.cards_dir.mkdir(parents=True, exist_ok=True)
             os.replace(src, self.card_path(program))
             self._cache.pop(program, None)
+            self._programs_cache = (0.0, [])
 
     def _actions(self) -> list[dict]:
         try:
@@ -115,6 +160,13 @@ class CardStore:
         actions = self._actions()
         actions.append(action)
         self._write_actions(actions)
+
+
+def _read_json(path: Path, default):
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return default
 
 
 def _safe(program: str) -> str:

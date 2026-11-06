@@ -116,4 +116,4 @@ def test_real_git_merges_man_pages():
         assert log.confidence == "high"
     assert "filter-branch" in card.root.subcommands
     assert card.nodes["rm"].risk == "change"
-    assert card.nodes["clean"].risk == "destroy"
+    assert card.nodes["clean"].risk == "change"

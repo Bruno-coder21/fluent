@@ -1,0 +1,331 @@
+# Valid commands an agent typically runs. fluent must NEVER block any of these.
+# One command per line; blank lines and lines starting with # are ignored.
+
+# --- git
+git status
+git status -sb
+git status --short --branch
+git status --porcelain
+git status --porcelain=v1
+git log --oneline -10
+git log --oneline --graph --decorate --all
+git log -n 5 --pretty=format:"%h %an %s"
+git log --since="2 weeks ago" --author="Bruno"
+git log --stat -3
+git log -p -- path/to/file.py
+git log --follow -- README.md
+git log --no-merges --format=%H origin/main..HEAD
+git log -S'needle' --oneline
+git log --grep=fix --oneline
+git log --name-only -1
+git log --reverse --format="%ad %s" --date=short
+git log --onel
+git diff
+git diff --staged
+git diff --cached --stat
+git diff HEAD~1 -- src/
+git diff --name-only main...HEAD
+git diff --word-diff
+git diff --color-words
+git diff -U0
+git show HEAD
+git show --stat HEAD~2
+git show HEAD:README.md
+git add -A
+git add .
+git add -p
+git add --all src/
+git commit -m "fix: handle empty input"
+git commit -am "wip"
+git commit --amend --no-edit
+git commit --allow-empty -m "trigger"
+git commit -m "x" --no-verify
+git checkout -b feature/x
+git checkout main
+git checkout -- file.txt
+git switch -c new-branch
+git switch main
+git restore --staged file.txt
+git restore file.txt
+git branch
+git branch -a
+git branch -vv
+git branch --show-current
+git branch -d merged-branch
+git branch --merged main
+git merge --no-ff feature
+git merge --abort
+git rebase main
+git rebase -i HEAD~3
+git rebase --continue
+git rebase --onto main old new
+git pull --rebase
+git pull origin main
+git fetch --all --prune
+git fetch origin --tags
+git push origin main
+git push -u origin feature/x
+git push --set-upstream origin HEAD
+git push origin --delete old-branch
+git push --tags
+git stash
+git stash push -m "wip" --include-untracked
+git stash list
+git stash pop
+git stash apply stash@{0}
+git tag -a v1.0 -m "release"
+git tag --list "v*"
+git remote -v
+git remote add origin https://github.com/x/y.git
+git remote set-url origin git@github.com:x/y.git
+git clone --depth 1 https://github.com/x/y.git
+git clone --branch main --single-branch https://github.com/x/y.git dir
+git rev-parse --abbrev-ref HEAD
+git rev-parse --show-toplevel
+git ls-files --others --exclude-standard
+git blame -L 10,20 file.py
+git cherry-pick -x abc123
+git reset --soft HEAD~1
+git reset HEAD file.txt
+git revert --no-edit HEAD
+git clean -n
+git config --global user.name "Bruno"
+git config --get remote.origin.url
+git config --list --show-origin
+git -C repo status
+git -c core.pager=cat log -1
+git --no-pager log -5 --oneline
+git shortlog -sn
+git describe --tags --abbrev=0
+git worktree add -b hotfix ../hotfix main
+git submodule update --init --recursive
+git bisect start
+git reflog -10
+git grep -n "TODO" -- "*.py"
+git help log
+git --version
+
+# --- gh
+gh auth status
+gh repo view
+gh repo view owner/repo --web
+gh repo view --json name,description
+gh repo clone owner/repo
+gh repo create my-app --public --source=. --remote=origin --push
+gh repo list owner --limit 50
+gh repo fork owner/repo --clone
+gh pr list
+gh pr list --state open --limit 20
+gh pr list --author "@me" --json number,title
+gh pr view 12
+gh pr view 12 --comments
+gh pr view --json title,body --jq .title
+gh pr create --title "Fix" --body "Details" --base main
+gh pr create --fill --draft
+gh pr checkout 42
+gh pr checks 42 --watch
+gh pr merge 42 --squash --delete-branch
+gh pr review 42 --approve
+gh pr diff 42
+gh pr comment 42 --body "LGTM"
+gh pr edit 42 --add-label bug
+gh pr status
+gh issue list --label bug --limit 10
+gh issue view 7
+gh issue create --title "Bug" --body "Steps" --label bug
+gh issue comment 7 --body "Thanks"
+gh issue close 7
+gh run list --limit 5
+gh run view 123 --log
+gh run watch 123
+gh workflow list
+gh workflow run ci.yml --ref main
+gh release list
+gh release create v1.0.0 --notes "First" --title "v1.0.0"
+gh release view v1.0.0
+gh api repos/owner/repo
+gh api -X POST repos/owner/repo/issues -f title=x
+gh api graphql -f query='{ viewer { login } }'
+gh search repos hermes --limit 5
+gh gist create file.txt --public
+gh label list
+gh secret list
+gh browse
+gh co 42
+
+# --- docker
+docker ps
+docker ps -a
+docker ps --filter status=running
+docker ps --format "{{.Names}}"
+docker ps -aq
+docker images
+docker image ls
+docker image ls --filter dangling=true
+docker run --rm -it ubuntu bash
+docker run -d --name web -p 8080:80 nginx
+docker run --rm -v "$PWD":/app -w /app node:20 npm test
+docker run --rm -e FOO=bar alpine env
+docker run --rm alpine sh -c "echo hi --not-a-docker-flag"
+docker run --rm --network host curlimages/curl -sS --not-docker http://localhost
+docker exec -it web sh
+docker exec web ls -la /usr/share/nginx/html
+docker logs -f --tail 100 web
+docker logs --since 10m web
+docker build -t app:latest .
+docker build -f Dockerfile.dev -t app:dev --no-cache .
+docker pull nginx:latest
+docker push registry.example.com/app:1.0
+docker inspect web
+docker inspect --format "{{.State.Status}}" web
+docker stats --no-stream
+docker top web
+docker cp web:/etc/nginx/nginx.conf .
+docker volume ls
+docker volume inspect data
+docker network ls
+docker network create mynet
+docker compose up -d
+docker compose ps
+docker compose logs -f api
+docker compose build --no-cache
+docker compose exec api sh
+docker system df
+docker info
+docker version
+docker login ghcr.io -u user --password-stdin
+docker tag app:latest app:1.0
+docker container ls --all
+docker image inspect nginx
+docker context ls
+docker -D ps
+docker --log-level debug ps
+
+# --- ffmpeg
+ffmpeg -i in.mp4 out.webm
+ffmpeg -y -i in.mp4 -c:v libx264 -crf 23 -preset slow -c:a aac -b:a 128k out.mp4
+ffmpeg -hide_banner -i in.mp4
+ffmpeg -hide_banner -y -i in.mp4 out.mp4
+ffmpeg -i in.mp4 -vf "scale=1280:-2" out.mp4
+ffmpeg -i in.mp4 -ss 00:00:10 -t 5 -c copy clip.mp4
+ffmpeg -ss 30 -i in.mp4 -frames:v 1 thumb.png
+ffmpeg -i in.mp4 -vn -acodec libmp3lame -q:a 2 out.mp3
+ffmpeg -i in.mp4 -an -c:v copy silent.mp4
+ffmpeg -i in.mp4 -map 0:v -map 0:a:0 -c copy out.mkv
+ffmpeg -f concat -safe 0 -i list.txt -c copy joined.mp4
+ffmpeg -i in.mp4 -filter_complex "[0:v]split=2[a][b]" -map "[a]" a.mp4 -map "[b]" b.mp4
+ffmpeg -framerate 30 -i img%03d.png -pix_fmt yuv420p out.mp4
+ffmpeg -i in.wav -ar 44100 -ac 2 out.wav
+ffmpeg -i in.mp4 -r 24 out.mp4
+ffmpeg -loglevel error -i in.mp4 -f null -
+ffmpeg -nostdin -i in.mp4 out.mkv
+ffmpeg -i in.mp4 -movflags +faststart out.mp4
+ffmpeg -i in.mp4 -b:v 2M -maxrate 2M -bufsize 1M out.mp4
+ffmpeg -i in.mp4 -vf fps=1 frames/%04d.jpg
+ffmpeg -i in.mp4 -metadata title="My video" out.mp4
+ffmpeg -stream_loop -1 -i in.mp4 -t 60 out.mp4
+ffmpeg -i in.mp4 -af "volume=1.5" out.mp4
+ffmpeg -i in.mp4 -s 640x360 out.mp4
+ffmpeg -rtsp_transport tcp -i rtsp://cam/stream -t 10 out.mp4
+ffmpeg -re -i in.mp4 -f flv rtmp://server/live
+ffmpeg -i in.mp4 -threads 4 out.mp4
+ffmpeg -version
+ffmpeg -encoders
+ffmpeg -h encoder=libx264
+ffmpeg -i a.mp4 -i b.wav -shortest -c:v copy -c:a aac out.mp4
+ffmpeg -i in.mp4 -c:v libx264 -tune film -profile:v high out.mp4
+ffmpeg -i in.gif -movflags faststart -pix_fmt yuv420p out.mp4
+ffmpeg -nostats -progress pipe:1 -i in.mp4 out.mp4
+ffmpeg -i in.mp4 -c:v libx264 -crf:v 20 out.mp4
+
+# --- curl
+curl https://example.com
+curl -sS https://api.github.com/repos/x/y
+curl -fsSL https://example.com/install.sh -o install.sh
+curl -X POST -H "Content-Type: application/json" -d '{"a":1}' https://httpbin.org/post
+curl --request PUT --data-binary @file.json https://x
+curl -I https://example.com
+curl --head https://example.com
+curl -L --max-time 10 --retry 3 https://x
+curl -u user:pass https://x
+curl --header "Authorization: Bearer $TOKEN" https://x
+curl -o /dev/null -w "%{http_code}" https://x
+curl --compressed https://x
+curl -k https://self-signed.local
+curl --connect-timeout 5 https://x
+curl -F "file=@photo.jpg" https://x/upload
+curl --data-urlencode "q=hello world" https://x
+curl -s https://x | jq .
+curl --json '{"a":1}' https://x
+curl -v https://x
+curl --fail-with-body https://x
+curl -C - -O https://x/file.iso
+curl --resolve example.com:443:127.0.0.1 https://example.com
+curl --http2 https://x
+curl --silent --show-error https://x
+curl -A "fluent-test" https://x
+
+# --- tar
+tar -czf archive.tar.gz dir/
+tar -xzf archive.tar.gz -C /tmp/out
+tar -tvf archive.tar
+tar czf backup.tgz src
+tar -cJf a.tar.xz dir
+tar --exclude='*.log' -czf a.tgz dir
+tar -xf a.tar --strip-components=1
+tar --list --file=a.tar
+tar -czvf a.tgz --exclude=node_modules .
+tar -xzf a.tgz --wildcards '*.txt'
+tar -cf - dir | gzip > a.tgz
+tar --create --gzip --file a.tgz dir
+tar -xvf a.tar.bz2
+tar --extract --file=a.tar --directory=out
+tar -rf a.tar newfile
+
+# --- jq
+jq .
+jq -r '.name' data.json
+jq '.items[] | {id, name}' data.json
+jq -c '.[]' data.json
+jq --arg name "Bruno" '.[] | select(.name == $name)' data.json
+jq -s 'add' a.json b.json
+jq -n '{a: 1}'
+jq --raw-output '.url'
+jq -e '.ok' resp.json
+jq --sort-keys . data.json
+jq -S . data.json
+jq --argjson n 3 '.[:$n]' data.json
+jq -r '.[] | @csv' data.json
+jq --tab . data.json
+jq --indent 4 . data.json
+
+# --- rsync
+rsync -av src/ dst/
+rsync -avz --delete src/ user@host:/backup/
+rsync -av --exclude='node_modules' --exclude=.git ./ dst/
+rsync -a --progress big.iso /mnt/usb/
+rsync -avh --dry-run src/ dst/
+rsync -e "ssh -p 2222" -av src/ host:dst/
+rsync -av --partial --append-verify src dst
+rsync -rlptD --chmod=Du+rwx src/ dst/
+rsync --archive --verbose --human-readable src/ dst/
+rsync -a --info=progress2 src/ dst/
+rsync -av --include='*.py' --exclude='*' src/ dst/
+rsync -avc src/ dst/
+rsync -a --link-dest=../prev src/ snap/
+rsync -az --bwlimit=1000 src/ host:dst/
+rsync -av --remove-source-files src/ dst/
+
+# --- mixed, wrapped, piped
+cd repo && git pull && docker compose up -d
+git log --oneline | head -5
+curl -s https://x | jq -r .name
+for f in *.wav; do ffmpeg -i "$f" "${f%.wav}.mp3"; done
+sudo docker ps -a
+GIT_PAGER=cat git log -3
+timeout 60 curl -fsS https://x
+bash -lc "git status && git diff --stat"
+docker ps -q | xargs docker stop
+git diff --stat && git commit -am "x" && git push
+ffmpeg -i "$IN" $EXTRA_FLAGS out.mp4
+git log $GIT_FLAGS

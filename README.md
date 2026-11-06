@@ -17,9 +17,24 @@ runs against them, before it runs:
 When everything is fine, fluent stays silent.
 
 > Status: work in progress for the Hermes Agent Plugin Hackathon (November 2026).
-> Done: command-line splitter, `/fluent adopt|show|forget|undo` with a live progress
-> message (git, gh, docker, ffmpeg, curl, tar, jq, rsync adopt in under 5 s).
-> Next: the guard (checking commands before they run), risk prompts, dashboard.
+> Done: adoption with a live progress message, the guard (checks every terminal command
+> before it runs), risk prompts through Hermes's own approval, learning offers, counters.
+> Tested on 311 real valid commands (0 blocked) and 17 typical AI mistakes (17 caught).
+> Next: dashboard rings, `@cli:` references, Portuguese, catalog submission.
+
+## What it looks like
+
+```
+agent> ffmpeg -y -i in.mp4 -c:v libx264 --crf 28 out.mp4
+🛡️ fluent caught `--crf` in ffmpeg → `-crf`
+agent> ffmpeg -y -i in.mp4 -c:v libx264 -crf 28 out.mp4      ✓
+```
+
+The guard only speaks when it is sure: it judges long options only, on commands it read
+with high confidence, for the exact binary it read (path, size and date must match), on
+the local terminal backend. Short options, positional arguments, unknown subcommands
+(aliases, plugins, extensions) and anything known only at run time (`$VAR`, globs) are
+never judged.
 
 ## Try it
 

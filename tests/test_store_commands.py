@@ -150,7 +150,7 @@ def test_show_forget_undo(tmp_store):
     assert "isn't in its help" in commands.handle(ctx, "show tool nope")
     assert "Forgot tool" in commands.handle(ctx, "forget tool")
     assert "is back" in commands.handle(ctx, "undo")
-    assert "Fluent in 1 program" in commands.handle(ctx, "")
+    assert "1 program fluent" in commands.handle(ctx, "")
 
 
 def test_unknown_verb_and_help(tmp_store):

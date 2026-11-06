@@ -30,7 +30,7 @@ def install(ctx) -> None:
 def handle(ctx, raw_args: str) -> str | None:
     parts = raw_args.split()
     if not parts:
-        return messages.status(_cards())
+        return _status()
     verb, rest = parts[0].lower(), parts[1:]
     try:
         if verb in ("adopt", "learn", "add"):
@@ -41,6 +41,14 @@ def handle(ctx, raw_args: str) -> str | None:
             return _forget(rest)
         if verb == "undo":
             return _undo()
+        if verb == "mode":
+            return _mode(rest)
+        if verb == "risk":
+            return _risk(rest)
+        if verb in ("not-now", "notnow", "never"):
+            return _not_now(rest)
+        if verb in ("status", "rings"):
+            return _status()
         if verb in ("help", "-h", "--help"):
             return messages.USAGE
     except Exception:  # a command must never crash the session
@@ -52,6 +60,39 @@ def handle(ctx, raw_args: str) -> str | None:
 def _cards():
     s = store()
     return [c for c in (s.load(p) for p in s.programs()) if c is not None]
+
+
+def _status() -> str:
+    s = store()
+    return messages.status(_cards(), s.counters(), s.config())
+
+
+def _mode(rest: list[str]) -> str:
+    choice = rest[0].lower() if rest else ""
+    if choice not in ("block", "warn", "off"):
+        return f"Mode is {store().config()['mode']}. Choose: /fluent mode block | warn | off"
+    store().set_config("mode", choice)
+    return messages.MODE_TEXT[choice]
+
+
+def _risk(rest: list[str]) -> str:
+    choice = rest[0].lower() if rest else ""
+    if choice not in ("on", "off"):
+        state_ = "on" if store().config().get("risk_prompts", True) else "off"
+        return f"Risk prompts are {state_}. Choose: /fluent risk on | off"
+    store().set_config("risk_prompts", choice == "on")
+    return ("🔴 fluent will ask before commands that delete things." if choice == "on" else
+            "fluent won't add its own prompts. Hermes's built-in approvals still apply.")
+
+
+def _not_now(rest: list[str]) -> str:
+    if not rest:
+        return "Which program? /fluent not-now <program>"
+    lst = list(store().config().get("not_now") or [])
+    if rest[0] not in lst:
+        lst.append(rest[0])
+        store().set_config("not_now", lst)
+    return f"Okay, I won't suggest {rest[0]} again."
 
 
 def _adopt(ctx, rest: list[str]) -> str | None:
@@ -79,7 +120,7 @@ def _adopt(ctx, rest: list[str]) -> str | None:
 
 def _show(rest: list[str]) -> str:
     if not rest:
-        return messages.status(_cards())
+        return _status()
     card = store().load(rest[0])
     if card is None:
         return f"I haven't learned {rest[0]} yet. Try: /fluent adopt {rest[0]}"

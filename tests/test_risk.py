@@ -15,7 +15,7 @@ from fluent.core.risk import classify_node, core_already_asks, is_destroy_flag
     ("docker", ["rm"], "Remove one or more containers", "destroy"),
     ("docker", ["run"], "Create and run a new container from an image", "change"),
     ("git", ["status"], "", "read"),
-    ("git", ["clean"], "", "destroy"),
+    ("git", ["clean"], "", "change"),  # override: nothing is deleted without -f, and Hermes asks for -f
     ("git", ["rm"], "", "change"),  # override: git keeps history, refuses modified files
     ("git", ["commit"], "", "change"),
     ("git", ["ls-files"], "", "read"),
@@ -38,6 +38,8 @@ def test_network():
     (["-f", "--force"], "force checkout (throw away local modifications)", True),
     (["-y"], "overwrite output files", False),
     (["-n", "--dry-run"], "dry run, do not delete anything", False),
+    (["--delete-branch"], "Delete the local and remote branch after merge", False),
+    (["-p", "--prune"], "prune remote-tracking branches no longer on remote", False),
     (["-v", "--verbose"], "increase verbosity", False),
 ])
 def test_destroy_flags(names, desc, destroy):

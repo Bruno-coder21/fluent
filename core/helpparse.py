@@ -164,9 +164,11 @@ def _parse_sections(text: str, style: str) -> ParsedHelp:
     for i, line in enumerate(lines):
         stripped = line.strip()
         low = stripped.lower()
-        if low.startswith("usage:"):
-            out.usage = out.usage or stripped[6:].strip()
+        if low.startswith(("usage:", "or:")):
+            out.usage = out.usage or stripped.split(":", 1)[1].strip()
             section = "usage"
+            # options that only appear in a usage line ("git diff --cached") are real too
+            _merge_usage_flags(out, stripped)
             continue
         head = _heading(line)
         if head is not None:
@@ -213,6 +215,26 @@ def _parse_sections(text: str, style: str) -> ParsedHelp:
     return out
 
 
+_USAGE_OPT = re.compile(r"(?<![\w-])(--?[A-Za-z][\w-]*)(=|\s*<)?")
+
+
+def usage_flags(line: str) -> list[Flag]:
+    """Option spellings mentioned in a usage/synopsis line, e.g. ``--cached``."""
+    out = []
+    for m in _USAGE_OPT.finditer(line):
+        name, val = m.group(1), m.group(2)
+        out.append(Flag(names=[name], takes_value=True if val else None, desc="(from usage)"))
+    return out
+
+
+def _merge_usage_flags(out: ParsedHelp, line: str) -> None:
+    known = {n for f in out.flags for n in f.names}
+    for flag in usage_flags(line):
+        if flag.names[0] not in known:
+            out.flags.append(flag)
+            known.add(flag.names[0])
+
+
 def _ignored(section: str) -> bool:
     return any(w in section for w in ("example", "learn more", "argument", "environment",
                                       "exit code", "see also", "json field"))
@@ -232,7 +254,11 @@ def _parse_ffmpeg(text: str) -> ParsedHelp:
         indent, dash, name, rest = m.groups()
         is_main = indent == ""
         if is_main:
-            value = bool(re.match(r"\s([A-Za-z_][\w|:\[\]-]*)\s{2,}", rest))
+            # "-c codec   desc" / "-stream_loop loop count  desc" take a value;
+            # "-y          desc" doesn't; "-hide_banner hide_banner  desc" repeats its own
+            # name as the argument label but is a boolean.
+            arg = re.match(r"^ (\S.*?)\s{2,}\S", rest)
+            value = bool(arg) and arg.group(1).strip() != name
             desc = rest.strip()
         else:  # AVOption line: "  -crf               <int>        E..V....... desc"
             value = "<" in rest.split("  ", 1)[0] or bool(re.match(r"\s+<", rest))

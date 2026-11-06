@@ -11,7 +11,7 @@ from ..core.card import Card, Node
 
 DOT = {"read": "🟢", "change": "🟡", "destroy": "🔴", "unknown": "⚪"}
 USAGE = ("/fluent adopt <program> · /fluent show <program> [subcommand] · "
-         "/fluent forget <program> · /fluent undo")
+         "/fluent forget <program> · /fluent undo · /fluent mode block|warn|off")
 
 
 def n(x: int) -> str:
@@ -87,12 +87,31 @@ def show_node(card: Card, node: Node) -> str:
     return "\n".join(lines)
 
 
-def status(cards: list[Card]) -> str:
+MODE_TEXT = {
+    "block": "🛡️ fluent stops commands with options that don't exist, and says the right one.",
+    "warn": "fluent lets those commands run and explains the error under their output.",
+    "off": "fluent is paused. Turn it back on: /fluent mode block",
+}
+
+
+def status(cards: list[Card], counters: dict | None = None, config: dict | None = None) -> str:
+    counters = counters or {}
+    config = config or {}
     if not cards:
         return ("fluent checks your agent's terminal commands against the real help of your "
                 "programs.\nStart with: /fluent adopt git")
     names = " · ".join(f"{c.program} {c.version}".strip() for c in cards)
-    return f"✅ Fluent in {len(cards)} program{'s' if len(cards) != 1 else ''}: {names}\n{USAGE}"
+    caught = int(counters.get("caught", 0))
+    tokens = int(counters.get("tokens_saved", 0))
+    lines = [
+        f"🟢 {plural(len(cards), 'program')} fluent · 🛡️ {plural(caught, 'error')} caught · "
+        f"⚡ ≈{n(tokens)} tokens saved",
+        names,
+    ]
+    if config.get("mode") in ("warn", "off"):
+        lines.append(MODE_TEXT[config["mode"]])
+    lines.append(USAGE)
+    return "\n".join(lines)
 
 
 def _sources(node: Node) -> str:

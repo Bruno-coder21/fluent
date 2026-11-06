@@ -33,10 +33,12 @@ _DESTROY_VERBS = ("delete", "remove", "prune", "purge", "destroy", "uninstall", 
 _READ_VERBS = ("list", "show", "display", "view", "print", "inspect", "search", "describe",
                "check", "verify", "get", "output", "fetch information", "query")
 
+# Only strong signals escalate a single option: "delete" alone is too common
+# ("--delete-branch after merge") and would turn every merge into a prompt.
 _DESTROY_FLAG = re.compile(
-    r"\b(delete|deletes|deletion|remove|removes|removal|purge|prune|wipe|erase|destroy|"
-    r"permanently|discard|throw away|without (asking|confirmation|prompting)|"
-    r"(skip|bypass) (the )?(confirmation|prompt))\b",
+    r"\b(purge|wipe|erase|destroy|permanently|discard|throw away|extraneous|"
+    r"without (asking|confirmation|prompting)|confirm deletion|"
+    r"(skip|skips|bypass) (the )?(confirmation|prompt))\b",
     re.I,
 )
 _SAFE_FLAG = re.compile(r"\b(dry[- ]?run|do not|don't|never|prevent|instead of|keep)\b", re.I)
@@ -72,6 +74,9 @@ def core_already_asks(command_text: str) -> bool:
 # `git rm` refuses to remove files with local changes and git keeps the history.
 RISK_OVERRIDES: dict[tuple[str, str], str] = {
     ("git", "rm"): "change",
+    # `git clean` deletes nothing without -f (clean.requireForce), and Hermes core
+    # already asks for `git clean -f...`: an extra prompt would only ever fire on dry runs.
+    ("git", "clean"): "change",
 }
 
 
@@ -105,7 +110,7 @@ def is_destroy_flag(flag: Flag) -> bool:
         return False
     if _DESTROY_FLAG.search(desc):
         return True
-    return any(n.lstrip("-") in ("delete", "purge", "prune", "remove-all", "rm") for n in flag.names)
+    return any(n.lstrip("-") in ("purge", "remove-all") for n in flag.names)
 
 
 def classify_card(card: Card) -> None:
