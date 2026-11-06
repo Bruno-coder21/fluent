@@ -17,7 +17,23 @@ runs against them, before it runs:
 When everything is fine, fluent stays silent.
 
 > Status: work in progress for the Hermes Agent Plugin Hackathon (November 2026).
-> Day 1: command-line splitter and plugin skeleton. Adoption, guard and dashboard are next.
+> Done: command-line splitter, `/fluent adopt|show|forget|undo` with a live progress
+> message (git, gh, docker, ffmpeg, curl, tar, jq, rsync adopt in under 5 s).
+> Next: the guard (checking commands before they run), risk prompts, dashboard.
+
+## Try it
+
+```
+/fluent adopt git          # learn git from its own help and man pages
+/fluent show gh repo delete
+/fluent forget git         # every action can be undone: /fluent undo
+```
+
+What adopting does: fluent runs `<program> --help` (and `<program> <command> --help`
+for programs whose help style is known to handle it safely), reads the program's man
+pages, and saves a card under `<HERMES_HOME>/plugin-data/fluent/`. It never runs a real
+command: no shell, stdin closed, an empty working directory, pagers disabled, 5 s per
+call, 25 s per program.
 
 ## Develop
 
