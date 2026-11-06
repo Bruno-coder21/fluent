@@ -34,11 +34,21 @@ class CardStore:
         self._cache: dict[str, tuple[float, Card]] = {}
         self._lock = threading.Lock()
         self._programs_cache: tuple[float, list[str]] = (0.0, [])
+        self._config_cache: tuple[float | None, dict] | None = None
 
     # ------------------------------------------------------------------ settings
     def config(self) -> dict:
+        """Settings, re-read only when config.json changes (the guard asks on every command)."""
+        try:
+            mtime = self.config_file.stat().st_mtime
+        except OSError:
+            mtime = None
+        if self._config_cache is not None and self._config_cache[0] == mtime:
+            return dict(self._config_cache[1])
         data = _read_json(self.config_file, {})
-        return {**DEFAULT_CONFIG, **(data if isinstance(data, dict) else {})}
+        cfg = {**DEFAULT_CONFIG, **(data if isinstance(data, dict) else {})}
+        self._config_cache = (mtime, cfg)
+        return dict(cfg)
 
     def set_config(self, key: str, value) -> None:
         with self._lock:
@@ -46,6 +56,7 @@ class CardStore:
             data = data if isinstance(data, dict) else {}
             data[key] = value
             _atomic_write(self.config_file, json.dumps(data))
+            self._config_cache = None
 
     # ------------------------------------------------------------------ counters (the rings)
     def counters(self) -> dict:
