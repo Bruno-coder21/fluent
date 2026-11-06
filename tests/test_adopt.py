@@ -117,3 +117,9 @@ def test_real_git_merges_man_pages():
     assert "filter-branch" in card.root.subcommands
     assert card.nodes["rm"].risk == "change"
     assert card.nodes["clean"].risk == "change"
+
+
+@pytest.mark.parametrize("name", ["/usr/bin/git", "./tool", "../x", "-rf"])
+def test_adopt_takes_names_not_paths(name):
+    with pytest.raises(AdoptError, match="name as you'd type it"):
+        adopt(name)

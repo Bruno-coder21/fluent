@@ -77,8 +77,10 @@ _SAFE_ENV_KEYS = ("PATH", "HOME", "USER", "LOGNAME", "TMPDIR", "XDG_CONFIG_HOME"
 
 def resolve_program(program: str) -> str:
     """Absolute path of an installed program, or raise AdoptError."""
-    if not program or "/" in program.strip("/") and not os.path.isabs(program):
-        raise AdoptError(f"`{program}` is not a program name.")
+    if not program or "/" in program or program.startswith("-"):
+        # the guard finds programs by name on PATH, so a card must be keyed the same way
+        raise AdoptError(f"Use the program's name as you'd type it (for example `git`), "
+                         f"not `{program}`.")
     path = shutil.which(program)
     if not path:
         raise AdoptError(f"I can't find `{program}` on this machine.")
@@ -88,7 +90,7 @@ def resolve_program(program: str) -> str:
 class Adopter:
     def __init__(self, program: str, progress: Progress | None = None, *,
                  man_dirs: list[str] | None = None, budget: float = TOTAL_BUDGET):
-        self.program = os.path.basename(program)
+        self.program = program  # a bare name; resolve_program() rejects paths
         self.progress = progress or (lambda stage, info: None)
         self.strategy = STRATEGIES.get(self.program, Strategy())
         self.man_dirs = man_dirs if man_dirs is not None else _man_dirs()

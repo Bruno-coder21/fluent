@@ -55,8 +55,10 @@ CORE_ALREADY_ASKS = [
         r"\bgit\s+branch\s+-D\b",
         r"\bgit\s+branch\b.*(-d\b|--delete\b).*(-f\b|--force\b)",
         r"\bgit\s+branch\b.*(-f\b|--force\b).*(-d\b|--delete\b)",
-        r"\bdocker(-compose|\s+compose)\s+.*\b(restart|stop|kill|down)\b",
-        r"\bdocker\s+(\S+\s+)*?(restart|stop|kill)\b",
+        # only global options may sit between docker and the verb (as in Hermes core);
+        # a container named "restart-x" must not count
+        r"\bdocker(-compose|\s+compose)\s+(-\S+\s+(\S+\s+)?)*?(restart|stop|kill|down)\b",
+        r"\bdocker\s+(-\S+\s+(\S+\s+)?)*?(restart|stop|kill)\b",
         r"\bdocker\s+.*(-H|--host)[=\s]+\S+",
         r"\bdocker\s+context\s+use\b",
         r"\bfind\b.*-delete\b",

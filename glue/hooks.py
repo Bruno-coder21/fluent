@@ -51,8 +51,6 @@ def on_pre_tool_call(tool_name: str = "", args: dict | None = None, tool_call_id
         if tool_name != "terminal" or not isinstance(args, dict):
             return None
         verdict = guard().check(args.get("command") or "")
-        if verdict.programs:
-            store().bump(checked=1)
         if verdict.action == "block":
             store().bump(caught=len(verdict.findings),
                          tokens_saved=TOKENS_PER_CATCH * len(verdict.findings))

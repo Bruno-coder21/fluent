@@ -77,7 +77,9 @@ def _summary() -> dict:
     cards = sorted((base / "cards").glob("*.json")) if (base / "cards").is_dir() else []
     programs = [s for s in (_card_summary(p) for p in cards) if s]
     counters = _read(base / "counters.json", {})
-    config = {**_DEFAULTS, **(_read(base / "config.json", {}) or {})}
+    raw = _read(base / "config.json", {})
+    config = {**_DEFAULTS, **(raw if isinstance(raw, dict) else {})}
+    counters = counters if isinstance(counters, dict) else {}
     return {
         "programs": programs,
         "counters": {

@@ -177,7 +177,7 @@ def test_pre_tool_call_blocks_and_counts(hook_env, monkeypatch):
     assert out["action"] == "block" and "--rmm" in out["message"] and "--rm" in out["message"]
     assert ctx.posts and ctx.posts[0].startswith("🛡️ fluent caught `--rmm`")
     c = store.counters()
-    assert c["caught"] == 1 and c["checked"] == 1 and c["tokens_saved"] > 0
+    assert c["caught"] == 1 and c["tokens_saved"] > 0
     assert hooks.on_pre_tool_call(tool_name="terminal", args={"command": "tool run --rm img"}) is None
     assert hooks.on_pre_tool_call(tool_name="read_file", args={"path": "x"}) is None
 
@@ -217,3 +217,49 @@ def test_post_tool_call_offers_to_learn_once(hook_env, monkeypatch):
                             result=json.dumps({"output": "wget: unrecognized option", "exit_code": 2}),
                             session_id="s1")
     assert len(ctx.posts) == 1
+
+
+# ----------------------------------------------------------------- review regressions
+@pytest.mark.parametrize("cmd", [
+    "tool $SUB --whatever",          # subcommand only known at run time: never judged
+    'tool "$(pick)" --whatever',
+])
+def test_dynamic_subcommand_is_never_judged(cmd):
+    assert check_invocation(split_command(cmd)[0], _card()).findings == []
+
+
+def test_git_accepts_no_prefix_negation():
+    card = Card(program="git", style="git", abbrev_ok=True)
+    card.nodes[""] = Node(path=[], confidence="high", subcommands=["log"])
+    card.nodes["log"] = Node(path=["log"], confidence="high", flags=[Flag(names=["--follow"])])
+    assert check_invocation(split_command("git log --no-follow")[0], card).findings == []
+    assert [f.token for f in check_invocation(split_command("git log --no-folow")[0], card).findings] == ["--no-folow"]
+
+
+def test_find_exec_hands_the_rest_to_another_program():
+    card = Card(program="find", style="gnu", abbrev_ok=True)
+    card.nodes[""] = Node(path=[], confidence="high", flags=[Flag(names=["--help"]), Flag(names=["--version"])])
+    assert check_invocation(split_command("find . -exec git log --oneline {} ;")[0], card).findings == []
+    assert check_invocation(split_command("find . --versoin")[0], card).findings
+
+
+@pytest.mark.parametrize("cmd,asks", [
+    ("docker rm restart-policy-test", False),
+    ("docker volume rm stop-data", False),
+    ("docker --context prod stop web", True),
+    ("docker compose -f x.yml down", True),
+])
+def test_core_rule_needs_the_verb_right_after_docker(cmd, asks):
+    from fluent.core.risk import core_already_asks
+    assert core_already_asks(cmd) is asks
+
+
+def test_warn_mode_keeps_the_destructive_prompt(real_store):
+    if "rsync" not in PROGRAMS:
+        pytest.skip("needs rsync")
+    real_store.set_config("mode", "warn")
+    try:
+        v = Guard(real_store, backend=lambda: "local").check("rsync -av --delete --exlude=x a/ b/")
+        assert v.action == "approve" and "--exlude" in v.message
+    finally:
+        real_store.set_config("mode", "block")

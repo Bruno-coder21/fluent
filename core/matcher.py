@@ -21,6 +21,7 @@ from dataclasses import dataclass, field
 from .card import Card, Flag, Node
 from .shellsplit import Invocation
 
+_FIND_EXEC = frozenset({"-exec", "-execdir", "-ok", "-okdir"})
 _PASSTHROUGH = re.compile(r"\b(COMMAND|CMD)\b[^\n]*\bARG|\[COMMAND\]|\[--\]\s*(COMMAND|ARG)", re.I)
 
 
@@ -78,7 +79,7 @@ def check_invocation(inv: Invocation, card: Card) -> Check:
         i += 1
 
     chk = Check(program=card.program, node=node, findings=pre_findings)
-    if node.subcommands and i < len(args) and not args[i].text.startswith("-") and not args[i].dynamic:
+    if node.subcommands and i < len(args) and (args[i].dynamic or not args[i].text.startswith("-")):
         chk.findings = pre_findings if root.confidence == "high" else []
         return chk  # unknown subcommand (alias, plugin, extension): never judged
     chk.certain = node.confidence == "high"
@@ -98,8 +99,8 @@ def check_invocation(inv: Invocation, card: Card) -> Check:
         if expecting_value:
             expecting_value = False
             continue
-        if t == "--":
-            break
+        if t == "--" or (card.program == "find" and t in _FIND_EXEC):
+            break  # after find -exec, the words belong to another program
         if w.dynamic and not t.startswith("--"):
             continue
         if not t.startswith("-") or t == "-":
@@ -147,6 +148,10 @@ def _check_long(token: str, known: dict[str, Flag], long_names: list[str], card:
     if _is_dynamic_name(name):
         return None, False
     flag = known.get(name)
+    if flag is None and card.style == "git" and name.startswith("--no-"):
+        # git parse-options accepts --no-<option> for any negatable long option
+        positive = "--" + name[5:]
+        flag = known.get(positive) or (_unique_prefix(positive, known) if card.abbrev_ok else None)
     if flag is None and card.abbrev_ok:
         flag = _unique_prefix(name, known)
         if flag is None and _ambiguous_prefix(name, long_names):

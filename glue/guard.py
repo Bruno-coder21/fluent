@@ -40,11 +40,11 @@ class Guard:
     def check(self, command: str, env_type: str | None = None) -> Verdict:
         if not isinstance(command, str) or not command.strip():
             return Verdict()
-        cfg = self.store.config()
-        if cfg.get("mode") == "off":
-            return Verdict()
         programs = self.store.programs_cached()
         if not programs or not might_invoke(command, programs):
+            return Verdict()  # the hot path: no file is read for commands fluent doesn't know
+        cfg = self.store.config()
+        if cfg.get("mode") == "off":
             return Verdict()
         local = (env_type or self._backend()) == "local"
         findings: list[tuple[Finding, Card]] = []
@@ -64,6 +64,13 @@ class Guard:
             if (ask is None and chk.destroy and cfg.get("risk_prompts", True)
                     and not core_already_asks(inv.segment)):
                 ask = (chk, card, inv.segment)
+        if findings and cfg.get("mode") == "warn" and ask is not None:
+            # warn mode never drops a destructive-command prompt: ask, and mention the finding
+            chk, card, segment = ask
+            key = ".".join(chk.node.path) if chk.node and chk.node.path else "-"
+            return Verdict("approve", message=_approval_message(chk, card, segment) + "\n"
+                           + _model_message(findings, "warn"),
+                           rule_key=f"fluent:{card.program}:{key}", programs=used)
         if findings:
             mode = "warn" if cfg.get("mode") == "warn" else "block"
             return Verdict(mode, message=_model_message(findings, mode),
