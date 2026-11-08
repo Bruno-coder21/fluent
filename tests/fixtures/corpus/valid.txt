@@ -329,3 +329,33 @@ docker ps -q | xargs docker stop
 git diff --stat && git commit -am "x" && git push
 ffmpeg -i "$IN" $EXTRA_FLAGS out.mp4
 git log $GIT_FLAGS
+
+# --- curl: its man page says every boolean option is turned off with --no-<option>
+# (and on again with the plain name), and any option can be prefixed with --expand-
+curl --no-include https://example.com
+curl --no-location -o page.html https://example.com
+curl -sS --no-progress-meter -o items.json https://api.example.com/items
+curl --progress-meter -o big.iso https://example.com/big.iso
+curl --buffer https://example.com
+curl --clobber -o page.html https://example.com
+curl https://example.com/a --next https://example.com/b
+curl --expand-url 'https://example.com/{{id}}' --variable id=42
+
+# --- rsync: "--no-OPTION  turn off an implied OPTION (e.g. --no-D)"
+rsync -a --no-perms src/ dst/
+rsync -a --no-owner --no-group src/ backup/
+rsync -a --no-D src/ dst/
+rsync -a --no-times --checksum src/ dst/
+
+# --- bsdtar: the tar macOS ships (libarchive); most options are only in its mdoc man page
+bsdtar -xzf app.tar.gz --strip-components 1 -C out
+bsdtar --exclude-vcs -czf src.tgz .
+bsdtar -cf - --numeric-owner dir
+bsdtar -tvf a.tar --include '*.py'
+bsdtar --create --file a.tar --verbose dir
+bsdtar --extract --file a.tar --directory out
+bsdtar -xf a.tar --to-stdout notes.txt
+bsdtar -cf a.tar --no-xattrs --no-mac-metadata dir
+bsdtar --zstd -cf a.tar.zst dir
+bsdtar --version
+

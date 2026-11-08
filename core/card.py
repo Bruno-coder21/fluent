@@ -11,7 +11,7 @@ import json
 import time
 from dataclasses import asdict, dataclass, field
 
-CARD_FORMAT = 1
+CARD_FORMAT = 2  # 2: adds `negatable` and `option_prefixes`; older cards never block
 
 RISK_ORDER = {"read": 0, "unknown": 1, "change": 1, "destroy": 2}
 
@@ -57,6 +57,8 @@ class Card:
     style: str = "generic"  # gnu | git | cobra | ffmpeg | generic
     abbrev_ok: bool = False  # unique prefixes of long options are accepted
     single_dash_long: bool = False  # options like -crf (ffmpeg style)
+    negatable: bool = False  # "--no-<option>" turns an option off (rsync, curl)
+    option_prefixes: list[str] = field(default_factory=list)  # curl: "--expand-<option>"
     nodes: dict[str, Node] = field(default_factory=dict)
     global_flags: list[Flag] = field(default_factory=list)
     alias_map: dict[str, str] = field(default_factory=dict)  # "container ls" -> "ps"

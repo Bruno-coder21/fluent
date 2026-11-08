@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import time
 
-from ..core.card import Card, Node
+from ..core.card import CARD_FORMAT, Card, Node
 
 DOT = {"read": "🟢", "change": "🟡", "destroy": "🔴", "unknown": "⚪"}
 USAGE = ("/fluent adopt <program> · /fluent show <program> [subcommand] · "
@@ -100,14 +100,20 @@ def status(cards: list[Card], counters: dict | None = None, config: dict | None 
     if not cards:
         return ("fluent checks your agent's terminal commands against the real help of your "
                 "programs.\nStart with: /fluent adopt git")
-    names = " · ".join(f"{c.program} {c.version}".strip() for c in cards)
+    current = [c for c in cards if c.format >= CARD_FORMAT]
+    old = [c for c in cards if c.format < CARD_FORMAT]
     caught = int(counters.get("caught", 0))
     tokens = int(counters.get("tokens_saved", 0))
     lines = [
-        f"🟢 {plural(len(cards), 'program')} fluent · 🛡️ {plural(caught, 'error')} caught · "
+        f"🟢 {plural(len(current), 'program')} fluent · 🛡️ {plural(caught, 'error')} caught · "
         f"⚡ ≈{n(tokens)} tokens saved",
-        names,
     ]
+    if current:
+        lines.append(" · ".join(f"{c.program} {c.version}".strip() for c in current))
+    if old:
+        # read by an older fluent: silent until read again (see README, "Updating")
+        lines.append("🔄 Read again after the update (silent until then): "
+                     + " · ".join(f"/fluent adopt {c.program}" for c in old))
     if config.get("mode") in ("warn", "off"):
         lines.append(MODE_TEXT[config["mode"]])
     lines.append(USAGE)
@@ -115,7 +121,8 @@ def status(cards: list[Card], counters: dict | None = None, config: dict | None 
 
 
 def _sources(node: Node) -> str:
-    return " + ".join("man page" if s == "man" else "help" for s in node.sources) or "help"
+    names = {"help": "help", "man": "man page", "man-unread": "man page (not readable)"}
+    return " + ".join(names.get(s, s) for s in node.sources) or "help"
 
 
 def _bar(done: int, total: int, width: int = 10) -> str:

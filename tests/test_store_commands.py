@@ -184,3 +184,14 @@ def test_trash_is_pruned_when_no_action_can_restore_it(tmp_path):
     assert len(trash) <= store_mod.MAX_ACTIONS
     s.undo()
     assert s.load("tool").version == str(store_mod.MAX_ACTIONS + 6)
+
+
+def test_cards_from_an_older_fluent_are_listed_apart(tmp_store):
+    # cards saved by fluent 1.0.1 never block (see the guard): /fluent must say so
+    tmp_store.save(make_card())
+    old = make_card()
+    old.program, old.format = "oldtool", 1
+    tmp_store.save(old)
+    out = commands.handle(FakeCtx(live=False), "")
+    assert out.startswith("🟢 1 program fluent")
+    assert "🔄 Read again after the update (silent until then): /fluent adopt oldtool" in out

@@ -25,7 +25,7 @@ from typing import Callable
 
 from .card import Card, Flag, Node
 from .helpparse import ParsedHelp, parse_help, parse_list_lines
-from .manparse import parse_man, read_man_file
+from .manparse import decode_roff, parse_man, read_man_file
 from .risk import classify_card
 
 CALL_TIMEOUT = 5.0
@@ -73,6 +73,24 @@ STRATEGIES: dict[str, Strategy] = {
                        recurse=False, single_dash_long=True, full_help=True, abbrev_ok=False),
     "curl": Strategy(root=[["--help", "all"], ["--help"]], recurse=False, full_help=True),
 }
+
+# The program's own docs say "--no-<option>" turns an option off:
+# rsync --help: "--no-OPTION  turn off an implied OPTION (e.g. --no-D)";
+# curl's man page: "all boolean options are ... disabled with --no-option".
+_NEGATION_HINT = re.compile(r'--no-OPTION\b|disabled with --no-option|prefix it with "no-"')
+
+
+# curl's man page: 'if the option name is prefixed with "--expand-"'.
+_PREFIX_HINT = re.compile(r'option name is prefixed with "?(--[a-z]+-)')
+
+
+def negation_hint(text: str) -> bool:
+    return bool(_NEGATION_HINT.search(text))
+
+
+def option_prefixes(text: str) -> list[str]:
+    return sorted(set(_PREFIX_HINT.findall(text)))
+
 
 _VERSION_ERROR = re.compile(r"unknown|illegal|unrecognized|invalid|usage:|error|not found", re.I)
 
@@ -122,6 +140,7 @@ class Adopter:
             card.single_dash_long = self.strategy.single_dash_long or parsed.style == "ffmpeg"
             card.abbrev_ok = (self.strategy.abbrev_ok if self.strategy.abbrev_ok is not None
                               else parsed.style in ("gnu", "git", "argparse"))
+            card.negatable = negation_hint(root_text)
             root = self._node_from(card, [], parsed)
             card.nodes[""] = root
             self.progress("root", {"style": parsed.style, "options": len(root.flags)})
@@ -232,12 +251,21 @@ class Adopter:
             if not src_path:
                 continue
             try:
-                flags = parse_man(read_man_file(src_path))
+                src = read_man_file(src_path)
+                flags = parse_man(src)
             except Exception:
-                continue
+                src, flags = "", []
+            if not node.path and src:
+                text = decode_roff(src)
+                card.negatable = card.negatable or negation_hint(text)
+                card.option_prefixes = sorted(set(card.option_prefixes) | set(option_prefixes(text)))
             if flags:
                 _merge_flags(node.flags, flags)
                 node.sources.append("man")
+            else:
+                # The full manual exists but none of it could be read: the help may be a
+                # summary, so this node must not be trusted enough to block.
+                node.sources.append("man-unread")
 
     def _confidence(self, card: Card, node: Node, root_parsed: ParsedHelp | None) -> str:
         has_man = "man" in node.sources
@@ -249,7 +277,7 @@ class Adopter:
             return "high" if (node.usage or node.flags) else "medium"
         n_flags = len(node.flags)
         incomplete = root_parsed is not None and root_parsed.incomplete_hint and not self.strategy.full_help
-        if incomplete and not has_man:
+        if (incomplete or "man-unread" in node.sources) and not has_man:
             return "medium"
         if n_flags >= 3 or has_man:
             return "high"

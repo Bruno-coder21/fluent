@@ -162,3 +162,83 @@ def test_error_text_is_not_a_version(tmp_path, monkeypatch):
     prog.chmod(0o755)
     monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ['PATH']}")
     assert adopt("nover", man_dirs=[]).version == ""
+
+
+# A tar shaped like macOS's: a short --help that lists only a few long options, and the
+# full list in an mdoc man page.
+BSDISH = textwrap.dedent("""\
+    #!/bin/sh
+    case "$*" in
+      "--version") echo "bsdish 3.7.2 - libarchive 3.7.2";;
+      "--help") cat <<'EOF'
+    bsdish: manipulate archive files
+    First option must be a mode specifier:
+      -c Create  -t List  -x Extract
+    Common Options:
+      -b #  Use # 512-byte records per I/O block
+      -f <filename>  Location of archive
+      -v    Verbose
+    Create: bsdish -c [options] [<file> | <dir>]
+      -z, -j, -J, --lzma  Compress archive with gzip/bzip2/xz/lzma
+      --format {{ustar|pax|cpio|shar}}  Select archive format
+      --exclude <pattern>  Skip files that match pattern
+    EOF
+      ;;
+      *) echo "REAL RUN: $*" >> "{marker}"; exit 3;;
+    esac
+""")
+
+
+@pytest.fixture
+def bsdish(tmp_path, monkeypatch):
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    script = bindir / "bsdish"
+    script.write_text(BSDISH.format(marker=tmp_path / "REAL_RUN"))
+    script.chmod(script.stat().st_mode | stat.S_IEXEC)
+    monkeypatch.setenv("PATH", f"{bindir}{os.pathsep}{os.environ.get('PATH', '')}")
+    mandir = tmp_path / "man"
+    (mandir / "man1").mkdir(parents=True)
+    return mandir
+
+
+def _findings(card, command):
+    from fluent.core.matcher import check_invocation
+    from fluent.core.shellsplit import split_command
+    return [f for inv in split_command(command) for f in check_invocation(inv, card).findings]
+
+
+def test_macos_style_tar_reads_its_mdoc_man_page(bsdish):
+    from test_manparse import MDOC
+    (bsdish / "man1" / "bsdish.1").write_text(MDOC)
+    card = adopt("bsdish", man_dirs=[str(bsdish)])
+    assert card.root.confidence == "high"
+    for ok in ("bsdish -xf a.tar --strip-components 1 -C out",
+               "bsdish --create --file a.tar --verbose dir",
+               "bsdish --exclude-vcs -czf a.tgz ."):
+        assert _findings(card, ok) == [], ok
+    found = _findings(card, "bsdish -xf a.tar --strip-componets 1")
+    assert [f.suggestion for f in found] == ["--strip-components"]
+
+
+def test_unreadable_man_page_never_blocks(bsdish):
+    # The help is only a summary and the full manual can't be read: not certain enough.
+    (bsdish / "man1" / "bsdish.1").write_text("nothing here a man reader understands\n")
+    card = adopt("bsdish", man_dirs=[str(bsdish)])
+    assert card.root.confidence == "medium"
+    assert _findings(card, "bsdish -xf a.tar --strip-components 1") == []
+
+
+def test_rules_read_from_the_programs_own_docs():
+    from fluent.core.adopt import negation_hint, option_prefixes
+    from fluent.core.manparse import decode_roff, read_man_file
+    fix = Path(__file__).parent / "fixtures" / "help"
+    # rsync --help: "--no-OPTION  turn off an implied OPTION (e.g. --no-D)"
+    assert negation_hint((fix / "rsync" / "root.txt").read_text())
+    # curl's man page: "all boolean options are ... disabled with --no-option" and
+    # 'if the option name is prefixed with "--expand-"'
+    curl_man = decode_roff(read_man_file(fix / "curl" / "man" / "curl.1"))
+    assert negation_hint(curl_man)
+    assert option_prefixes(curl_man) == ["--expand-"]
+    # GNU tar documents its own --no-* options one by one: no general rule
+    assert not negation_hint(decode_roff(read_man_file(fix / "tar" / "man" / "tar.1")))

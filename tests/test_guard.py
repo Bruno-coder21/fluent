@@ -11,7 +11,7 @@ from pathlib import Path
 import pytest
 
 from fluent.core.adopt import adopt
-from fluent.core.card import Card, Flag, Node
+from fluent.core.card import CARD_FORMAT, Card, Flag, Node
 from fluent.core.matcher import check_invocation
 from fluent.core.shellsplit import split_command
 from fluent.core.store import CardStore
@@ -20,7 +20,8 @@ from fluent.glue import hooks, state
 from fluent.glue.guard import Guard
 
 CORPUS = Path(__file__).parent / "fixtures" / "corpus"
-PROGRAMS = [p for p in "git gh docker ffmpeg curl tar jq rsync".split() if shutil.which(p)]
+ALL_PROGRAMS = "git gh docker ffmpeg curl tar jq rsync bsdtar".split()  # bsdtar: the tar macOS ships
+PROGRAMS = [p for p in ALL_PROGRAMS if shutil.which(p)]
 
 
 def corpus_lines(name: str) -> list[str]:
@@ -42,7 +43,7 @@ def real_guard(real_store):
 
 
 def _uses_only_installed(cmd: str) -> bool:
-    known = set("git gh docker ffmpeg curl tar jq rsync".split())
+    known = set(ALL_PROGRAMS)
     return all(i.program in PROGRAMS for i in split_command(cmd) if i.program in known)
 
 
@@ -283,3 +284,67 @@ def test_path_qualified_program_is_not_judged_against_another_binary(real_store)
     assert g.check("/opt/other/curl --silentt x").action == "allow"
     real = shutil.which("curl")
     assert g.check(f"{real} --silentt x").action == "block"
+
+
+# ------------------------------------------------- "--no-<option>" and option prefixes
+def _negatable_card() -> Card:
+    # as rsync and curl document it: --no-<option> turns an option off, curl lists
+    # --no-buffer whose plain form is --buffer, and curl's --expand-<option>
+    card = Card(program="tool", style="gnu", abbrev_ok=True, negatable=True,
+                option_prefixes=["--expand-"])
+    card.nodes[""] = Node(path=[], confidence="high", flags=[
+        Flag(names=["-p", "--perms"]), Flag(names=["-D"]), Flag(names=["--no-buffer"]),
+        Flag(names=["--url"], takes_value=True)])
+    return card
+
+
+@pytest.mark.parametrize("cmd,tokens", [
+    ("tool --no-perms x", []),
+    ("tool --no-D x", []),  # rsync: --no-D turns off -D
+    ("tool --buffer x", []),  # the plain form of a listed --no-buffer
+    ("tool --expand-url u x", []),
+    ("tool --no-per x", ["--no-per"]),  # shortened --no- names are errors outside git
+    ("tool --no-prems x", ["--no-prems"]),
+    ("tool --expand-urll u", ["--expand-urll"]),
+])
+def test_negation_and_prefix_rules(cmd, tokens):
+    chk = check_invocation(split_command(cmd)[0], _negatable_card())
+    assert [f.token for f in chk.findings] == tokens
+
+
+def test_no_negation_unless_the_docs_say_so():
+    card = _negatable_card()
+    card.negatable = False
+    chk = check_invocation(split_command("tool --no-perms x")[0], card)
+    assert [f.token for f in chk.findings] == ["--no-perms"]
+
+
+def test_suggestions_keep_the_meaning():
+    card = _negatable_card()
+    first = lambda cmd: check_invocation(split_command(cmd)[0], card).findings[0].suggestion  # noqa: E731
+    assert first("tool --no-prems x") == "--no-perms"
+    assert first("tool --bufer x") == "--buffer"  # not --no-buffer, the opposite
+
+
+def test_cards_from_an_older_format_never_block(tmp_path):
+    import os
+    sh = os.path.realpath(shutil.which("sh"))
+    st = os.stat(sh)
+    card = _card()
+    card.path, card.size, card.mtime = sh, st.st_size, st.st_mtime
+    store = CardStore(tmp_path)
+    store.save(card)
+    guard = Guard(store, backend=lambda: "local", which=lambda p: sh)
+    assert guard.check("tool run --rmm img").action == "block"
+    card.format = CARD_FORMAT - 1  # read by fluent 1.0.1: re-read before it may block
+    store.save(card)
+    guard = Guard(store, backend=lambda: "local", which=lambda p: sh)
+    assert guard.check("tool run --rmm img").action == "allow"
+
+
+def test_macos_tar_error_is_recognized():
+    from fluent.core.learn import looks_like_option_error
+    # bsdtar, the tar that ships with macOS
+    assert looks_like_option_error("bsdtar: Option --exclud-vcs is not supported\nUsage:\n")
+    assert looks_like_option_error("tar: Option --exclud-vcs is not supported")
+    assert not looks_like_option_error("this archive format is not supported")

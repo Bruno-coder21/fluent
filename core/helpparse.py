@@ -20,7 +20,7 @@ from dataclasses import dataclass, field
 
 from .card import Flag
 
-_NAME = re.compile(r"^(-{1,2})(\[no-\])?([A-Za-z0-9?@#][\w.+-]*)(\[?=.*|\[.*)?$")
+_NAME = re.compile(r"^(-{1,2})(\[no-\])?([A-Za-z0-9?@#:][\w.+-]*)(\[?=.*|\[.*)?$")
 _SPEC_TOKENS = re.compile(r"<[^>]*>|\{[^}]*\}|,|\||[^\s,|]+")
 _ALLCAPS = re.compile(r"[A-Z][A-Z0-9_\-:.|/\[\]]*\.{0,3}")
 _SUB_LINE = re.compile(r"^\s{1,12}([a-z][\w.-]*)(\*)?(:)?(?:\s{2,}|:\s+)(\S.*)?$")
@@ -92,7 +92,7 @@ def parse_help(text: str, program: str = "", style: str | None = None) -> Parsed
 def parse_option_spec(line: str, style: str = "gnu") -> Flag | None:
     """Parse one option line (``-a, --all  desc``) into a Flag, or None."""
     s = line.strip()
-    if not re.match(r"-{1,2}(\[no-\])?[A-Za-z0-9?@#]", s):
+    if not re.match(r"-{1,2}(\[no-\])?[A-Za-z0-9?@#:]", s):
         return None
     gap = re.search(r"\s{2,}|\t", s)
     spec, desc = (s[: gap.start()], s[gap.end():].strip()) if gap else (s, "")

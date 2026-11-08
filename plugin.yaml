@@ -1,5 +1,5 @@
 name: fluent
-version: "1.0.1"
+version: "1.0.2"
 description: >-
   Your agent becomes fluent in any program. fluent reads the help and man pages of the
   command-line programs installed on your machine, then checks every terminal command the

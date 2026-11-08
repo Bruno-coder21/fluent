@@ -61,6 +61,8 @@ def _card_summary(path: Path) -> dict | None:
         "options": options,
         "learned_at": card.get("created_at", 0),
         "partial": bool(card.get("partial")),
+        # saved by fluent 1.0.1 (card format 1): silent until adopted again
+        "needs_reread": int(card.get("format") or 1) < 2,
         **risks,
     }
     _cache[str(path)] = (mtime, summary)

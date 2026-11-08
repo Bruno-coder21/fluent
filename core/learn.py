@@ -8,7 +8,7 @@ _OPTION_ERRORS = re.compile(
     r"unrecognized option|unknown option|unknown flag|flag provided but not defined|"
     r"invalid option|illegal option|no such option|option .{0,40} is unknown|"
     r"unknown switch|is not a git command|unknown command|Option not found|"
-    r"Unrecognized option '",
+    r"Unrecognized option '|option .{0,40} is not supported",
     re.I,
 )
 

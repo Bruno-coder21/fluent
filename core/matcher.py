@@ -150,18 +150,44 @@ def _check_long(token: str, known: dict[str, Flag], long_names: list[str], card:
     if _is_dynamic_name(name):
         return None, False
     flag = known.get(name)
-    if flag is None and card.style == "git" and name.startswith("--no-"):
-        # git parse-options accepts --no-<option> for any negatable long option
-        positive = "--" + name[5:]
-        flag = known.get(positive) or (_unique_prefix(positive, known) if card.abbrev_ok else None)
+    if flag is None and _negates(name, card):
+        # git parse-options, rsync and curl accept --no-<option> to turn an option off
+        # (rsync also --no-D for -D); the negated form never takes a value. Only git
+        # also accepts it shortened (curl --no-inc and rsync --no-per are errors).
+        rest = name[5:]
+        positive = "--" + rest
+        neg = known.get(positive) or (_unique_prefix(positive, known)
+                                      if card.abbrev_ok and card.style == "git" else None)
+        if neg is None and card.negatable and len(rest) == 1:
+            neg = known.get("-" + rest)
+        if neg is not None:
+            return None, False
+    if flag is None and card.negatable and not name.startswith("--no-") and known.get("--no-" + name[2:]):
+        return None, False  # curl lists --no-buffer; by its own rule --buffer is the option itself
+    for prefix in card.option_prefixes if flag is None else ():
+        if name.startswith(prefix) and len(name) > len(prefix):
+            inner = known.get("--" + name[len(prefix):])
+            if inner is not None:
+                return None, bool(inner.takes_value is True and not eq)
     if flag is None and card.abbrev_ok:
         flag = _unique_prefix(name, known)
         if flag is None and _ambiguous_prefix(name, long_names):
             return None, False  # the program will say "ambiguous"; not ours to judge
     if flag is not None:
         return None, bool(flag.takes_value is True and not eq)
-    suggestion = _closest(name, long_names)
+    suggestion = ""
+    if _negates(name, card):
+        positive = _closest("--" + name[5:], long_names)
+        suggestion = "--no-" + positive[2:] if positive else ""
+    if not suggestion:
+        # for curl, --buffer is as real as the --no-buffer its docs list
+        positives = [f"--{n[5:]}" for n in long_names if n.startswith("--no-")] if card.negatable else []
+        suggestion = _closest(name, long_names + positives)
     return Finding("unknown_option", card.program, command, name, suggestion), False
+
+
+def _negates(name: str, card: Card) -> bool:
+    return name.startswith("--no-") and len(name) > 5 and (card.style == "git" or card.negatable)
 
 
 def _check_single_dash(token: str, known: dict[str, Flag], card: Card,

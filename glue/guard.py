@@ -11,7 +11,7 @@ import shutil
 import time
 from dataclasses import dataclass, field
 
-from ..core.card import Card
+from ..core.card import CARD_FORMAT, Card
 from ..core.matcher import Check, Finding, check_invocation
 from ..core.risk import core_already_asks
 from ..core.shellsplit import might_invoke, split_command
@@ -96,7 +96,7 @@ class Guard:
             if path:
                 real = os.path.realpath(path)
                 st = os.stat(real)
-                ok = (real == card.path and st.st_size == card.size
+                ok = (card.format >= CARD_FORMAT and real == card.path and st.st_size == card.size
                       and abs(st.st_mtime - card.mtime) < 1e-3)
         except OSError:
             ok = False

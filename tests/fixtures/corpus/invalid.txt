@@ -17,3 +17,8 @@ curl --max-tme 5 https://x	--max-tme	--max-time
 tar --extrakt -f a.tar	--extrakt	--extract
 jq --raw-outptu .	--raw-outptu	--raw-output
 rsync -av --exlude=x src/ dst/	--exlude	--exclude
+curl --no-includ https://example.com	--no-includ	--no-include
+curl --bufer https://example.com	--bufer	--buffer
+rsync -a --no-prems src/ dst/	--no-prems	--no-perms
+bsdtar -xf a.tar --strip-componets 1	--strip-componets	--strip-components
+bsdtar -czf src.tgz --exclude-vsc .	--exclude-vsc	--exclude-vcs

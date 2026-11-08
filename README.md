@@ -34,7 +34,7 @@ check every command before it runs, and stop the wrong one.
 
 | | |
 |---|---|
-| 📖 **Adopt** | `/fluent adopt ffmpeg` reads the help (and every subcommand's help) and the man pages of the version installed here, and keeps a compact card: commands, options, which options take a value, and a risk class per command. A live message shows progress. git, gh, docker, ffmpeg, curl, tar, jq and rsync each adopt in under 5 seconds. |
+| 📖 **Adopt** | `/fluent adopt ffmpeg` reads the help (and every subcommand's help) and the man pages of the version installed here, and keeps a compact card: commands, options, which options take a value, and a risk class per command. It also keeps the rules a program's own docs state, such as rsync's and curl's `--no-<option>`. A live message shows progress. git, gh, docker, ffmpeg, curl, tar, jq and rsync each adopt in under 5 seconds. |
 | 🛡️ **Guard** | Before every terminal command, fluent checks the options of the programs it adopted. An option that doesn't exist is stopped with the closest real one (`--rmm` → `--rm`, `--exlude` → `--exclude`, `--crf` → `-crf`). |
 | 🔴 **Ask** | A command that deletes things (`gh repo delete`, `docker image prune`, `rsync --delete`) goes to **Hermes's own approval prompt**, explained in plain words. fluent only ever *adds* caution: it never approves anything and skips what Hermes already asks about (`git push --force`, `docker stop`, ...), so you are never asked twice. |
 | 💡 **Learn** | When a program fluent doesn't know rejects an option, it offers once to learn it. It never adopts anything on its own. |
@@ -60,6 +60,10 @@ Then, in any Hermes chat:
 
 The dashboard tab appears as **fluent** in `hermes dashboard` (restart the dashboard
 after installing).
+
+**Updating from 1.0.1:** 1.0.2 reads more from each program's docs, so cards saved by
+1.0.1 are no longer trusted to block. Run `/fluent adopt <program>` again for each
+program; until then fluent stays silent for it.
 
 ## Commands
 
@@ -92,9 +96,9 @@ A false block would be worse than no plugin, so the guard only speaks when it is
 It reads commands the way a shell does: pipes, `&&`, `;`, subshells, `sudo`, `env`,
 `timeout`, `xargs`, `watch`, `bash -c '...'`, quotes and redirections.
 
-**Tested**: 311 real-world valid commands across git, gh, docker, ffmpeg, curl, tar, jq
-and rsync are never blocked; 17 typical AI mistakes are all caught with the right fix
-(`tests/fixtures/corpus/`). 542 tests in total.
+**Tested**: 333 real-world valid commands across git, gh, docker, ffmpeg, curl, tar, jq,
+rsync and bsdtar (the `tar` macOS ships) are never blocked; 22 typical mistakes are all
+caught with the right fix (`tests/fixtures/corpus/`). 587 tests in total.
 
 ## What fluent does on your machine (disclosure)
 
@@ -149,7 +153,10 @@ and rsync are never blocked; 17 typical AI mistakes are all caught with the righ
   `gh api -X DELETE`, `rsync --delete-excluded`).
 - fluent trusts the binary on Hermes's own `PATH`; a different copy on a session's `PATH`
   (venv, nvm, direnv) may be judged against the wrong help.
-- Tested on Linux (Ubuntu 24.04). macOS uses the same code paths; Windows is untested.
+- Tested on Linux (Ubuntu 24.04). macOS uses the same code paths, and fluent also reads
+  BSD/macOS man pages (mdoc). The cards for tar, rsync, ls, cp, find, grep, sed and curl
+  were checked against the help and man pages of a real Mac (macOS 14), with no valid
+  option blocked; fluent itself has not been run on a Mac yet. Windows is untested.
 
 ## Next
 
@@ -161,7 +168,7 @@ and rsync are never blocked; 17 typical AI mistakes are all caught with the righ
 ## Develop
 
 ```bash
-scripts/test.sh                       # 542 tests (throwaway uv env, Python 3.14)
+scripts/test.sh                       # 587 tests (throwaway uv env, Python 3.14)
 scripts/capture_fixtures.sh           # refresh help/man fixtures from this machine
 hermes plugins validate . --install-deps
 ```
